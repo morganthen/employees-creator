@@ -77,14 +77,14 @@ Two tables: `employee` and `role`, joined N:1 (`employee.role_id` to `role.id`).
 
 ### Environment Variables
 
-| Variable         | Description                  | Example / Default      |
-| :--------------- | :--------------------------- | :--------------------- |
-| `DB_HOST`        | Database host address        | `localhost`            |
-| `DB_PORT`        | Database port number         | `3306` (MySQL)         |
-| `DB_NAME`        | Name of the database         | `employees_creator`    |
-| `DB_USERNAME`    | Database connection username | `root`                 |
-| `DB_PASSWORD`    | Database connection password | `your_secure_password` |
-| `SPRING_PROFILE` | Active Spring profile        | `dev` / `prod` / `test`|
+| Variable         | Description                  | Example / Default       |
+| :--------------- | :--------------------------- | :---------------------- |
+| `DB_HOST`        | Database host address        | `localhost`             |
+| `DB_PORT`        | Database port number         | `3306` (MySQL)          |
+| `DB_NAME`        | Name of the database         | `employees_creator`     |
+| `DB_USERNAME`    | Database connection username | `root`                  |
+| `DB_PASSWORD`    | Database connection password | `your_secure_password`  |
+| `SPRING_PROFILE` | Active Spring profile        | `dev` / `prod` / `test` |
 
 ### Example `.env` file
 
@@ -179,4 +179,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 - **Backend API:** Spring Boot REST API serving employee and role endpoints (in progress).
 - **Frontend Application:** React + TypeScript single-page app consuming the REST endpoints (planned).
-- **Related project:** extends the patterns from an earlier Spring Boot build, the Java + React To Do API (https://github.com/morganthen/todo-api): layered controllers, services, repositories, DTOs, soft delete, OpenAPI.
+- **Related project:** extends the patterns from an earlier Spring Boot build, the Java + React To Do API (https://github.com/morganthen/rmndr): layered controllers, services, repositories, DTOs, soft delete, OpenAPI.
