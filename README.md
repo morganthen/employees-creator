@@ -77,14 +77,13 @@ Two tables: `employee` and `role`, joined N:1 (`employee.role_id` to `role.id`).
 
 ### Environment Variables
 
-| Variable         | Description                  | Example / Default       |
-| :--------------- | :--------------------------- | :---------------------- |
-| `DB_HOST`        | Database host address        | `localhost`             |
-| `DB_PORT`        | Database port number         | `3306` (MySQL)          |
-| `DB_NAME`        | Name of the database         | `employees_creator`     |
-| `DB_USERNAME`    | Database connection username | `root`                  |
-| `DB_PASSWORD`    | Database connection password | `your_secure_password`  |
-| `SPRING_PROFILE` | Active Spring profile        | `dev` / `prod` / `test` |
+| Variable      | Description                  | Example / Default       |
+| :------------ | :--------------------------- | :---------------------- |
+| `DB_HOST`     | Database host address        | `localhost`             |
+| `DB_PORT`     | Database port number         | `3306` (MySQL)          |
+| `DB_NAME`     | Name of the database         | `employees_creator`     |
+| `DB_USER`     | Database connection username | `root`                  |
+| `DB_PASSWORD` | Database connection password | (empty for local MySQL) |
 
 ### Example `.env` file
 
@@ -92,16 +91,16 @@ Two tables: `employee` and `role`, joined N:1 (`employee.role_id` to `role.id`).
 DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=employees_creator
-DB_USERNAME=root
-DB_PASSWORD=secret
-SPRING_PROFILE=dev
+DB_USER=root
+DB_PASSWORD=
 ```
 
 Mapped in `application.properties`:
 
 ```properties
-spring.datasource.url=jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
-spring.datasource.username=${DB_USERNAME}
+spring.config.import=optional:file:.env[.properties]
+spring.datasource.url=jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?createDatabaseIfNotExist=true
+spring.datasource.username=${DB_USER}
 spring.datasource.password=${DB_PASSWORD}
 spring.jpa.hibernate.ddl-auto=update
 ```
@@ -123,7 +122,8 @@ spring.jpa.hibernate.ddl-auto=update
 ## Features
 
 - [x] Spring Boot scaffold boots (Maven, Spring Boot 4.1.1, Java 17 target)
-- [ ] `role` lookup entity, repository and `GET /api/roles`
+- [x] `role` lookup entity
+- [ ] `role` repository, service, seeder and `GET /api/roles`
 - [ ] `employee` entity and repository
 - [ ] Employee create, read, update and archive endpoints
 - [ ] Bean Validation (AU mobile, email, contract dates, hours, state)
@@ -135,7 +135,7 @@ spring.jpa.hibernate.ddl-auto=update
 ## Known Issues
 
 - No CI workflow yet, so the test badges above are placeholders until GitHub Actions is added.
-- Local MySQL credentials are not configured. Two Homebrew services exist (`mysql` 9.x running, `mysql@8.4` in an error state).
+- Local dev connects as MySQL `root` with an empty password, read from `.env`. Set a real password and keep it out of version control before any non-local use.
 - No global exception handling or standard API error shape yet.
 
 ---
@@ -161,11 +161,25 @@ spring.jpa.hibernate.ddl-auto=update
 - Added the MIT `LICENSE` file.
 - Added this README following the nology README standard.
 
+**03/10/2026 - MySQL Wiring & Role Entity**
+
+- Wired the app to MySQL: `application.properties` reads `${DB_*}` placeholders from a gitignored `.env` via `spring.config.import=optional:file:.env[.properties]`.
+- Created the `role` entity (`Long` id mapped to MySQL `BIGINT` identity, unique `name`, `createdAt` audit field).
+- Dropped the `description` field from `role` (YAGNI) and updated the ERD.
+
 ---
 
 ## What did you struggle with?
 
+**02/10/2026**
+
 - **Scope creep vs YAGNI on the schema:** judging which future needs to design for now (a separate addresses table, multi-role employees, public IDs) against keeping the MVP small. Resolved by limiting the MVP to two tables and writing down an explicit trigger for each deferred decision.
+
+**03/10/2026**
+
+- **Database wiring after a month off:** forgot the connection setup entirely and used the previous Spring Boot project as a starting point.
+- **JPA constructors:** added a `Role(String name)` constructor and forgot that it removes the implicit no-arg constructor Hibernate requires.
+- **Small details that slipped:** camelCase field naming, that `LocalDateTime` is available for audit timestamps, and matching the entity's `Long` id to the DB's `BIGINT`.
 
 ---
 
