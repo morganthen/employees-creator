@@ -122,8 +122,8 @@ spring.jpa.hibernate.ddl-auto=update
 ## Features
 
 - [x] Spring Boot scaffold boots (Maven, Spring Boot 4.1.1, Java 17 target)
-- [x] `role` lookup entity
-- [ ] `role` repository, service, seeder and `GET /api/roles`
+- [x] `role` lookup entity, repository, service, DTO, controller (`GET /api/roles`) and seeder
+- [x] OpenAPI/Swagger via springdoc
 - [ ] `employee` entity and repository
 - [ ] Employee create, read, update and archive endpoints
 - [ ] Bean Validation (AU mobile, email, contract dates, hours, state)
@@ -136,6 +136,7 @@ spring.jpa.hibernate.ddl-auto=update
 
 - No CI workflow yet, so the test badges above are placeholders until GitHub Actions is added.
 - Local dev connects as MySQL `root` with an empty password, read from `.env`. Set a real password and keep it out of version control before any non-local use.
+- Authentication/authorization is deferred, so `GET /api/roles` and the Swagger docs are currently public.
 - No global exception handling or standard API error shape yet.
 
 ---
@@ -167,6 +168,12 @@ spring.jpa.hibernate.ddl-auto=update
 - Created the `role` entity (`Long` id mapped to MySQL `BIGINT` identity, unique `name`, `createdAt` audit field).
 - Dropped the `description` field from `role` (YAGNI) and updated the ERD.
 
+**04/10/2026 - Role Vertical Slice & Swagger**
+
+- Completed the Role slice end to end: `RoleRepository` (`JpaRepository<Role, Integer>`, `findByName`, `existsByName`), `RoleService` (`findAll`, `getDefaultRole`), `RoleResponse` record, `RoleController` (`GET /api/roles`) and a `RoleSeeder` that seeds Executive, Manager and Staff.
+- Changed the Role id to `int` (repository id type `Integer`); `employee.id` stays `Long`.
+- Added springdoc-openapi `3.0.3` for Swagger, live at `/swagger-ui/index.html`.
+
 ---
 
 ## What did you struggle with?
@@ -180,6 +187,12 @@ spring.jpa.hibernate.ddl-auto=update
 - **Database wiring after a month off:** forgot the connection setup entirely and used the previous Spring Boot project as a starting point.
 - **JPA constructors:** added a `Role(String name)` constructor and forgot that it removes the implicit no-arg constructor Hibernate requires.
 - **Small details that slipped:** camelCase field naming, that `LocalDateTime` is available for audit timestamps, and matching the entity's `Long` id to the DB's `BIGINT`.
+
+**04/10/2026**
+- **Seeing the whole picture.** Spring Boot's conventions make each piece look small, but it was hard to see how controller, service, repository, DTO and entity join up end to end, so it felt like something to memorise. A one-page flow map fixed that.
+- **Repository id-type mismatch.** Switched `Role.id` to `int` but left `JpaRepository<Role, Long>`; the repository's id type must match the entity's identifier type.
+- **A silent seeder.** `@Profile("dev")` meant the seeder never ran because no profile was active. Removed the restriction for now; the `count() == 0` guard keeps it safe.
+- **Swagger not loading.** Needed the right springdoc line (3.x for Spring Boot 4), a Maven reload, and a restart, since a dependency change alters the classpath.
 
 ---
 
