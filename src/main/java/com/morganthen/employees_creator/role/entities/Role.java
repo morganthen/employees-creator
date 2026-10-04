@@ -27,7 +27,10 @@ public class Role {
     private LocalDateTime createdAt;
 
     protected Role() {
+    }
 
+    public Role(String name) {
+        this.name = name;
     }
 
     public Long getId() {
