@@ -115,7 +115,7 @@ spring.jpa.hibernate.ddl-auto=update
 - **Archive over delete.** Records carry an `archived_at` timestamp so employment history is preserved. Email uniqueness applies to active rows only.
 - **Roles as a lookup table.** Roles change without a code deploy and feed the form dropdown through `GET /api/roles`.
 - **AU-only address handling.** Australian mobile format, AU states and 4-digit postcodes. No country column.
-- **Hand-rolled over generated.** No Lombok. Explicit getters, setters and mappers so every pattern can be explained.
+- **Hand-rolled over generated.** No Lombok. Entities use explicit accessors and mappers; API-boundary DTOs are Java 17 records, so every pattern can still be explained.
 
 ---
 
@@ -124,9 +124,10 @@ spring.jpa.hibernate.ddl-auto=update
 - [x] Spring Boot scaffold boots (Maven, Spring Boot 4.1.1, Java 17 target)
 - [x] `role` lookup entity, repository, service, DTO, controller (`GET /api/roles`) and seeder
 - [x] OpenAPI/Swagger via springdoc
-- [ ] `employee` entity and repository
+- [x] `employee` entity, `EmployeeStatus`/`EmploymentType` enums and repository
+- [x] `CreateEmployeeRequest` record DTO with Bean Validation constraints
 - [ ] Employee create, read, update and archive endpoints
-- [ ] Bean Validation (AU mobile, email, contract dates, hours, state)
+- [ ] Bean Validation wired through the create endpoint (`@Valid`)
 - [ ] Role dropdown fed from the API (client)
 - [ ] React + TypeScript client
 
@@ -174,6 +175,15 @@ spring.jpa.hibernate.ddl-auto=update
 - Changed the Role id to `int` (repository id type `Integer`); `employee.id` stays `Long`.
 - Added springdoc-openapi `3.0.3` for Swagger, live at `/swagger-ui/index.html`.
 
+**05/10/2026 - Employee Entity, Enums & Create DTO**
+
+- Added the `Employee` entity: `Long` id (`BIGINT`), `@ManyToOne` `role` (`role_id`, NOT NULL), `LocalDate` contract dates, `BigDecimal` `hours_per_week` (`DECIMAL(4,1)`), `@Enumerated(EnumType.STRING)` status/type, and an `archived_at` archive flag.
+- Renamed `EmployeeEntity` to `Employee` for symmetry with `Role`; dropped `@Email`/`@DateTimeFormat` off the entity (validation belongs on the DTO) and fixed the `employment_type` column typo.
+- Added `EmployeeStatus` (`PERMANENT`, `CONTRACT`) and `EmploymentType` (`FULL_TIME`, `PART_TIME`) enums.
+- Added `EmployeeRepository` (`JpaRepository<Employee, Long>`) with `existsByEmailAndArchivedAtIsNull`, `findByArchivedAtIsNull` and `findByIdAndArchivedAtIsNull`.
+- Added `CreateEmployeeRequest` as a record DTO carrying Bean Validation (`@NotBlank`, `@NotNull`, `@Email`, `@Pattern`, `@Size`, `@DecimalMin`/`@DecimalMax`).
+- Stubbed `EmployeeController` at `/api/employees`.
+
 ---
 
 ## What did you struggle with?
@@ -193,6 +203,13 @@ spring.jpa.hibernate.ddl-auto=update
 - **Repository id-type mismatch.** Switched `Role.id` to `int` but left `JpaRepository<Role, Long>`; the repository's id type must match the entity's identifier type.
 - **A silent seeder.** `@Profile("dev")` meant the seeder never ran because no profile was active. Removed the restriction for now; the `count() == 0` guard keeps it safe.
 - **Swagger not loading.** Needed the right springdoc line (3.x for Spring Boot 4), a Maven reload, and a restart, since a dependency change alters the classpath.
+
+**05/10/2026**
+
+- **Records as request DTOs.** Had only used a record for the response side (`RoleResponse`) and had never seen one as an inbound DTO. Learned that Jackson deserialises records through the canonical constructor (no getters/setters required), and that Bean Validation constraints written on record components apply to the field, the constructor parameter and the accessor. Accessors are component-named (`firstName()`), not `getFirstName()`.
+- **Why DTOs need accessors at all.** The sticking point was that the entity has no accessors yet works. Entity fields are populated by Hibernate via reflection; DTO fields are populated by Jackson from JSON, which discovers Java properties through getters/setters (or a matching constructor). A record supplies that constructor for free.
+- **`@NotBlank` only validates `CharSequence`.** Applied it to `Integer roleId` and `LocalDate` fields, which fails at validation time with `UnexpectedTypeException`; required non-string fields need `@NotNull`.
+- **Optional vs required fields.** Marked `middleName` and `addressLine2` as `@NotBlank` when the ERD makes them nullable — validation constraints must mirror the schema's nullability.
 
 ---
 
