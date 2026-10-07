@@ -184,6 +184,14 @@ spring.jpa.hibernate.ddl-auto=update
 - Added `CreateEmployeeRequest` as a record DTO carrying Bean Validation (`@NotBlank`, `@NotNull`, `@Email`, `@Pattern`, `@Size`, `@DecimalMin`/`@DecimalMax`).
 - Stubbed `EmployeeController` at `/api/employees`.
 
+**07/10/2026 - Employee Service (Create + Read Rules)**
+
+- Added `EmployeeResponse` as the full employee representation (all fields plus `roleId`/`roleName`), replacing the placeholder record.
+- Added `EmployeeService`:
+  - `findAll()` returns active-only employees (`findByArchivedAtIsNull`), mapped to `EmployeeResponse`, under `@Transactional(readOnly = true)`.
+  - `create(CreateEmployeeRequest)` resolves the `roleId`, rejects a duplicate active email (409), enforces `endDate >= startDate`, normalises the mobile to `+614...`, maps the DTO to an `Employee` entity, saves, and returns the mapped saved entity.
+- Kept the entity inside the service boundary; the repository deals only in entities, the controller only in DTOs.
+
 ---
 
 ## What did you struggle with?
@@ -210,6 +218,15 @@ spring.jpa.hibernate.ddl-auto=update
 - **Why DTOs need accessors at all.** The sticking point was that the entity has no accessors yet works. Entity fields are populated by Hibernate via reflection; DTO fields are populated by Jackson from JSON, which discovers Java properties through getters/setters (or a matching constructor). A record supplies that constructor for free.
 - **`@NotBlank` only validates `CharSequence`.** Applied it to `Integer roleId` and `LocalDate` fields, which fails at validation time with `UnexpectedTypeException`; required non-string fields need `@NotNull`.
 - **Optional vs required fields.** Marked `middleName` and `addressLine2` as `@NotBlank` when the ERD makes them nullable — validation constraints must mirror the schema's nullability.
+- **Record component lists can be long.** Didn't realise a record's parameter list in the round brackets can hold as many components as needed — all 16 `CreateEmployeeRequest` fields live there, so the whole DTO shape sits in one place instead of being spread across fields, getters and setters.
+
+**07/10/2026**
+
+- **Where the response DTO actually belongs.** Thought the DTO travelled DB → repo → service. It doesn't: the repository deals in **entities**, and the response DTO is produced in the **service** and handed to the controller. Entities never cross the API boundary.
+- **`save()` returns the entity.** Didn't know `JpaRepository.save(T)` returns the managed entity with its generated `id` and `@CreationTimestamp`/`@UpdateTimestamp` values populated — so map the **returned** instance, not the one passed in.
+- **Two `@Transactional` annotations.** `readOnly = true` is undefined on `jakarta.transaction.Transactional`; the Spring one (`org.springframework.transaction.annotation.Transactional`) has it. Swapped the import.
+- **Format vs business rules.** Single-field format checks live on the DTO; rules needing another field or the database (active-email uniqueness, `endDate >= startDate`) live in the service.
+- **Lazy loading in the mapping.** `EmployeeResponse.of` reads `employee.getRole().getName()`, and `role` is `FetchType.LAZY`, so the mapping needs an open transaction or it throws `LazyInitializationException`. Also flagged the N+1 risk on the list (fix later with `@EntityGraph` / join fetch).
 
 ---
 
