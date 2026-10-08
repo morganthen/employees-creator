@@ -192,6 +192,11 @@ spring.jpa.hibernate.ddl-auto=update
   - `create(CreateEmployeeRequest)` resolves the `roleId`, rejects a duplicate active email (409), enforces `endDate >= startDate`, normalises the mobile to `+614...`, maps the DTO to an `Employee` entity, saves, and returns the mapped saved entity.
 - Kept the entity inside the service boundary; the repository deals only in entities, the controller only in DTOs.
 
+**08/10/2026 - Layering Consistency (Role → service returns DTOs)**
+
+- Refactored the Role slice to match the Employee slice and the Flow Map: `RoleService.findAll` and `getDefaultRole` now return `RoleResponse` (mapping inside the service), and `RoleController` just delegates.
+- Both controllers are now pure traffic controllers; both services return DTOs. The entity never leaves the service.
+
 ---
 
 ## What did you struggle with?
@@ -227,6 +232,11 @@ spring.jpa.hibernate.ddl-auto=update
 - **Two `@Transactional` annotations.** `readOnly = true` is undefined on `jakarta.transaction.Transactional`; the Spring one (`org.springframework.transaction.annotation.Transactional`) has it. Swapped the import.
 - **Format vs business rules.** Single-field format checks live on the DTO; rules needing another field or the database (active-email uniqueness, `endDate >= startDate`) live in the service.
 - **Lazy loading in the mapping.** `EmployeeResponse.of` reads `employee.getRole().getName()`, and `role` is `FetchType.LAZY`, so the mapping needs an open transaction or it throws `LazyInitializationException`. Also flagged the N+1 risk on the list (fix later with `@EntityGraph` / join fetch).
+
+**08/10/2026**
+
+- **Which layer maps entity → DTO.** Role mapped entity→DTO in the controller while Employee mapped in the service, so the codebase carried two competing patterns. Picked the service-returns-DTO rule (per the Flow Map) and pushed Role to match rather than regressing Employee.
+- **A return-type change ripples to call sites.** Changing `RoleService.findAll` to return `RoleResponse` broke `RoleController`, which still expected `List<Role>`; the compiler caught it. The service and its callers must move together.
 
 ---
 

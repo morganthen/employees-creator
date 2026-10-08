@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.morganthen.employees_creator.role.dtos.RoleResponse;
 import com.morganthen.employees_creator.role.entities.Role;
 
 @Service
@@ -14,13 +15,15 @@ public class RoleService {
         this.roleRepository = roleRepository;
     }
 
-    public List<Role> findAll() {
-        return roleRepository.findAll();
+    public List<RoleResponse> findAll() {
+        List<Role> roles = roleRepository.findAll();
+        return RoleResponse.of(roles);
     }
 
-    public Role getDefaultRole() {
-        return roleRepository.findByName("Staff")
+    public RoleResponse getDefaultRole() {
+        Role defaultRole = roleRepository.findByName("Staff")
                 .orElseThrow(() -> new IllegalStateException("Default role 'Staff' was not seeded"));
+        return RoleResponse.of(defaultRole);
     }
 
 }

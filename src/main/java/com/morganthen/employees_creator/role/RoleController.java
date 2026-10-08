@@ -4,7 +4,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.morganthen.employees_creator.role.dtos.RoleResponse;
-import com.morganthen.employees_creator.role.entities.Role;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -26,9 +25,7 @@ public class RoleController {
 
     @GetMapping
     public ResponseEntity<List<RoleResponse>> getRoles() {
-        List<Role> roles = roleService.findAll();
-        return ResponseEntity.ok(RoleResponse.of(roles));
-
+        return ResponseEntity.ok(roleService.findAll());
     }
 
 }
