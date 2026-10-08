@@ -192,10 +192,12 @@ spring.jpa.hibernate.ddl-auto=update
   - `create(CreateEmployeeRequest)` resolves the `roleId`, rejects a duplicate active email (409), enforces `endDate >= startDate`, normalises the mobile to `+614...`, maps the DTO to an `Employee` entity, saves, and returns the mapped saved entity.
 - Kept the entity inside the service boundary; the repository deals only in entities, the controller only in DTOs.
 
-**08/10/2026 - Layering Consistency (Role → service returns DTOs)**
+**08/10/2026 - Layering Consistency, Employee Endpoints & Schema Reset**
 
 - Refactored the Role slice to match the Employee slice and the Flow Map: `RoleService.findAll` and `getDefaultRole` now return `RoleResponse` (mapping inside the service), and `RoleController` just delegates.
 - Both controllers are now pure traffic controllers; both services return DTOs. The entity never leaves the service.
+- Wired `EmployeeController` (`GET /api/employees`, `POST /api/employees`) and tested both in Swagger.
+- Reset the local `employees` table: `ddl-auto=update` had accumulated stale columns from earlier field renames (see struggles).
 
 ---
 
@@ -237,6 +239,7 @@ spring.jpa.hibernate.ddl-auto=update
 
 - **Which layer maps entity → DTO.** Role mapped entity→DTO in the controller while Employee mapped in the service, so the codebase carried two competing patterns. Picked the service-returns-DTO rule (per the Flow Map) and pushed Role to match rather than regressing Employee.
 - **A return-type change ripples to call sites.** Changing `RoleService.findAll` to return `RoleResponse` broke `RoleController`, which still expected `List<Role>`; the compiler caught it. The service and its callers must move together.
+- **`ddl-auto=update` rots the schema (a real 500).** After renaming `emploment_type` → `employment_type`, the insert failed with *"Field 'emploment_type' doesn't have a default value"*. `update` is **additive only** — it added the new column but never dropped the old `NOT NULL` one, so the table carried both plus other leftovers from earlier drafts. Fixed by dropping and recreating the local table. Lesson: `ddl-auto=update` is fine for a spike but is not a migration tool; real projects use Flyway/Liquibase with `ddl-auto=validate`.
 
 ---
 
