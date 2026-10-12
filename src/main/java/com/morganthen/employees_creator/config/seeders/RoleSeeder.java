@@ -1,13 +1,14 @@
 package com.morganthen.employees_creator.config.seeders;
 
 import org.springframework.boot.CommandLineRunner;
-
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import com.morganthen.employees_creator.role.RoleRepository;
 import com.morganthen.employees_creator.role.entities.Role;
 
 @Component
+@Order(1)
 public class RoleSeeder implements CommandLineRunner {
     private final RoleRepository roleRepository;
 
