@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.morganthen.employees_creator.common.exceptions.NotFoundException;
 import com.morganthen.employees_creator.employee.dtos.CreateEmployeeRequest;
 import com.morganthen.employees_creator.employee.dtos.EmployeeResponse;
 import com.morganthen.employees_creator.employee.entities.Employee;
@@ -80,6 +81,14 @@ public class EmployeeService {
         // save to repo
         Employee saved = employeeRepository.save(e);
         return EmployeeResponse.of(saved);
+
+    }
+
+    @Transactional(readOnly = true)
+    public EmployeeResponse findById(Long id) {
+        Employee employee = employeeRepository.findByIdAndArchivedAtIsNull(id)
+                .orElseThrow(() -> new NotFoundException("Employee not found: " + id));
+        return EmployeeResponse.of(employee);
 
     }
 

@@ -126,10 +126,12 @@ spring.jpa.hibernate.ddl-auto=update
 - [x] OpenAPI/Swagger via springdoc
 - [x] `employee` entity, `EmployeeStatus`/`EmploymentType` enums and repository
 - [x] `CreateEmployeeRequest` record DTO with Bean Validation constraints
-- [ ] Employee create, read, update and archive endpoints
-- [ ] Bean Validation wired through the create endpoint (`@Valid`)
+- [x] Employee create + read endpoints (`POST /api/employees`, `GET /api/employees`, `GET /api/employees/{id}`)
+- [x] Bean Validation wired through the create endpoint (`@Valid`)
+- [x] Global exception handling: `@RestControllerAdvice` + `ApiErrorResponse` (not-found + `@Valid` validation errors)
+- [ ] Employee update + archive endpoints
+- [ ] React + TypeScript client (employee list slice in progress)
 - [ ] Role dropdown fed from the API (client)
-- [ ] React + TypeScript client
 
 ---
 
@@ -138,7 +140,8 @@ spring.jpa.hibernate.ddl-auto=update
 - No CI workflow yet, so the test badges above are placeholders until GitHub Actions is added.
 - Local dev connects as MySQL `root` with an empty password, read from `.env`. Set a real password and keep it out of version control before any non-local use.
 - Authentication/authorization is deferred, so `GET /api/roles` and the Swagger docs are currently public.
-- No global exception handling or standard API error shape yet.
+- Exception handling is **partial**: `NotFoundException` and `@Valid` failures return the clean `ApiErrorResponse`, but `EmployeeService.create` still throws `ResponseStatusException` for its 400/409 cases (unknown role, duplicate email, bad dates), so those still render Spring's default error body. Pending: custom exceptions + handlers for the service rules, and a request logger/filter.
+- No tests or CI yet (test badges below are placeholders).
 
 ---
 
@@ -199,6 +202,14 @@ spring.jpa.hibernate.ddl-auto=update
 - Wired `EmployeeController` (`GET /api/employees`, `POST /api/employees`) and tested both in Swagger.
 - Reset the local `employees` table: `ddl-auto=update` had accumulated stale columns from earlier field renames (see struggles).
 
+**13/10/2026 - Frontend Scaffold, List Slice & Global Exception Handling**
+
+- Scaffolded the frontend in-repo (`frontend/`, monorepo): Vite + React + TypeScript, Tailwind v4 (via `@tailwindcss/vite`), React Query, React Router. Added a dev proxy (`/api → http://localhost:8080`) so the browser avoids CORS in development.
+- Built the **employee list slice**: a typed `Employee` API module + `getEmployees()`, an `EmployeeList` with loading/error/empty states, and a clickable `EmployeeCard` (`<Link>` to `/employees/:id`). The card's three-dot menu was deliberately dropped in favour of a detail page for Edit/Archive — destructive actions shouldn't be one mis-tap away.
+- Added `EmployeeService.findById` + `GET /api/employees/{id}` (active-only via `findByIdAndArchivedAtIsNull`, 404 when absent).
+- Added **global exception handling**: `@RestControllerAdvice` `GlobalExceptionHandler`, an `ApiErrorResponse` record (`timestamp/status/error/message/path/details`), a custom `NotFoundException`, and a `MethodArgumentNotValidException` handler that returns a field→messages `details` map. This replaced Spring's default leaky error body (which shipped a full `trace`).
+- Added `EmployeeSeeder`, seeding through `EmployeeService.create` (so seeded rows pass the real rules), guarded by `count() == 0`.
+
 ---
 
 ## What did you struggle with?
@@ -241,6 +252,15 @@ spring.jpa.hibernate.ddl-auto=update
 - **A return-type change ripples to call sites.** Changing `RoleService.findAll` to return `RoleResponse` broke `RoleController`, which still expected `List<Role>`; the compiler caught it. The service and its callers must move together.
 - **`ddl-auto=update` rots the schema (a real 500).** After renaming `emploment_type` → `employment_type`, the insert failed with *"Field 'emploment_type' doesn't have a default value"*. `update` is **additive only** — it added the new column but never dropped the old `NOT NULL` one, so the table carried both plus other leftovers from earlier drafts. Fixed by dropping and recreating the local table. Lesson: `ddl-auto=update` is fine for a spike but is not a migration tool; real projects use Flyway/Liquibase with `ddl-auto=validate`.
 
+**13/10/2026**
+
+- **The exception resolver chain.** Understanding *why* a global handler works meant learning that `DispatcherServlet` walks resolvers in order — `ExceptionHandlerExceptionResolver` → `ResponseStatusExceptionResolver` → `DefaultHandlerExceptionResolver` → `/error`/`BasicErrorController` — and that `@RestControllerAdvice` intercepts at step one. Before central handling, error responses leaked a full Java stack trace in the body.
+- **Automatic vs custom exceptions.** The dividing line is *who owns the rule*: Spring throws for declarations and HTTP mechanics (`MethodArgumentNotValidException`, `MethodArgumentTypeMismatchException`, `HttpMessageNotReadableException`…); you throw for domain rules (not found, duplicate email, unknown role). `@ExceptionHandler` is a type-keyed lookup built at startup — subclasses match, most specific wins.
+- **`@ExceptionHandler` is an annotation, not a bean.** The *class* is the bean, registered because `@RestControllerAdvice` is meta-annotated with `@Component`.
+- **Wrong auto-import (silent bug).** The IDE imported `org.springframework.data.crossstore.ChangeSetPersister.NotFoundException` instead of the project's own. It compiled, so the `@ExceptionHandler` silently never matched. Caught only by reading the import line.
+- **curl vs the browser.** Learned `curl` as a command-line HTTP client; for GETs the browser works too — but the API is on `:8080` under `/api/...`, while `:5173` is the Vite frontend, so testing `/employees/200` there wouldn't reach the API.
+- **Vertical slices.** Building front-to-back in thin slices (list → detail → actions) keeps each change small and testable — Alex's guidance, and it's holding up.
+
 ---
 
 ## Licensing Details
@@ -252,5 +272,5 @@ This project is licensed under the [MIT License](LICENSE).
 ## Further details, related projects, reimplementations
 
 - **Backend API:** Spring Boot REST API serving employee and role endpoints (in progress).
-- **Frontend Application:** React + TypeScript single-page app consuming the REST endpoints (planned).
+- **Frontend Application:** React + TypeScript single-page app consuming the REST endpoints (in progress — employee list slice first).
 - **Related project:** extends the patterns from an earlier Spring Boot build, the Java + React To Do API (https://github.com/morganthen/rmndr): layered controllers, services, repositories, DTOs, soft delete, OpenAPI.

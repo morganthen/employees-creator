@@ -1,9 +1,14 @@
+import EmployeeDetails from "./components/EmployeeDetails";
 import EmployeeList from "./EmployeeList";
+import { Routes, Route } from "react-router";
 
 function App() {
   return (
     <div>
-      <EmployeeList />
+      <Routes>
+        <Route path="/" element={<EmployeeList />} />
+        <Route path="/employees/:id" element={<EmployeeDetails />} />
+      </Routes>
     </div>
   );
 }
