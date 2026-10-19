@@ -1,5 +1,6 @@
 package com.morganthen.employees_creator.employee;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -77,7 +78,6 @@ public class EmployeeService {
         e.setEndDate(req.endDate());
         e.setEmploymentType(req.employmentType());
         e.setHoursPerWeek(req.hoursPerWeek());
-
         // save to repo
         Employee saved = employeeRepository.save(e);
         return EmployeeResponse.of(saved);
@@ -90,6 +90,14 @@ public class EmployeeService {
                 .orElseThrow(() -> new NotFoundException("Employee not found: " + id));
         return EmployeeResponse.of(employee);
 
+    }
+
+    @Transactional
+    public void archive(Long id) {
+        Employee employee = employeeRepository.findByIdAndArchivedAtIsNull(id)
+                .orElseThrow(() -> new NotFoundException("Employee not found: " + id));
+        employee.setArchivedAt(LocalDateTime.now());
+        employeeRepository.save(employee);
     }
 
 }

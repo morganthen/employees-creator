@@ -131,8 +131,10 @@ spring.jpa.hibernate.ddl-auto=update
 - [x] Global exception handling: `@RestControllerAdvice` + `ApiErrorResponse` (404 not-found · 400 `@Valid` · 409 conflict · 422 unprocessable)
 - [x] Custom domain exceptions: `NotFoundException` (404), `ConflictException` (409), `UnprocessableContentException` (422)
 - [x] `Employee.isOngoing()` derived entity logic + first unit test
-- [ ] Employee update + archive endpoints
-- [ ] Service (Mockito) + end-to-end (RestAssured) tests · CI · Flyway migrations
+- [x] Employee archive (soft delete) — `DELETE /api/employees/{id}` → 204
+- [x] First service unit tests (`EmployeeServiceTest`, Mockito) — archive slice
+- [ ] Employee update endpoint (`PUT /api/employees/{id}`)
+- [ ] End-to-end (RestAssured) tests · CI · Flyway migrations
 - [ ] React + TypeScript client (list + detail slices in progress)
 - [ ] Role dropdown fed from the API (client)
 
@@ -225,6 +227,12 @@ spring.jpa.hibernate.ddl-auto=update
 - Switched `application.properties` to `spring.datasource.url=${DB_URL}` (whole URL in `.env`, the nology convention) and `spring.jpa.hibernate.ddl-auto=validate`; added `.env.example`.
 - Began aligning the project with Alex's live-build reference `full_stack_todo` (Flyway migrations + a Mockito/RestAssured test harness are next).
 
+**20/10/2026 - Archive Slice & First Service Test**
+
+- Added the **archive (soft-delete) slice**: `EmployeeService.archive(id)` finds the active employee (`findByIdAndArchivedAtIsNull`), sets `archivedAt`, and saves; throws `NotFoundException` (→ 404) if not found. `DELETE /api/employees/{id}` added to the controller, returning **204 No Content**.
+- Because the list query is active-only, archived employees disappear from `GET /api/employees` automatically.
+- Added the project's **first service unit test** (`EmployeeServiceTest`, Mockito): success path (sets `archivedAt` + calls `save`) and not-found path (throws `NotFoundException`, never saves).
+
 ---
 
 ## What did you struggle with?
@@ -284,6 +292,14 @@ spring.jpa.hibernate.ddl-auto=update
 - **A red test caught a real mistake.** `isOngoing_whenEndDateIsSet_isFalse` was written with `assertTrue` — the mismatch failed immediately, which is exactly the point of testing as you go.
 - **No-arg constructors (again).** An entity gets an implicit no-arg constructor *only* while it declares no constructors; adding the first convenience constructor removes it, so it must be re-declared for JPA — the `Role` trap, re-learned.
 - **`update` → `validate` has teeth.** Flipping the setting boots fine on a machine whose schema already matches, but a fresh DB (teammate/CI) has no tables, and any entity change fails the boot — which is why it's paired with Flyway.
+
+**20/10/2026**
+
+- **`@Mock` vs `@InjectMocks`.** Annotated the service under test with `@Mock`, which made it a dumb stub — nothing ran, so `archivedAt` was never set and `save` was never called. `@InjectMocks` builds a **real** service and injects the mocks; `@Mock` is only for its collaborators.
+- **Mocks stub the exact method the code calls.** After the service switched to `findByIdAndArchivedAtIsNull`, the test still stubbed `findById`; Mockito's default `Optional.empty()` made the service throw `NotFoundException`, and strict stubbing flagged the now-unused stub. Stubs must move with the code.
+- **`new Employee()` is a real but empty object.** No id, no data — which is fine, because `archive` only needs something to stamp and save. Fake the **collaborators** (repos); use real (if empty) **domain objects**.
+- **`@Transactional` in plain English.** Wraps the method in one all-or-nothing DB transaction — commit on a normal return, roll back on a `RuntimeException` — and keeps the persistence context open so lazy loading and dirty checking work.
+- **204 + `ResponseEntity.noContent().build()`.** Delete has no payload to return; success is signalled by the status code, not a body.
 
 ---
 
