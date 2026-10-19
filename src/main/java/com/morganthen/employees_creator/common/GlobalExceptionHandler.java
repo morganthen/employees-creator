@@ -13,8 +13,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.morganthen.employees_creator.common.dtos.ApiErrorResponse;
-
+import com.morganthen.employees_creator.common.exceptions.ConflictException;
 import com.morganthen.employees_creator.common.exceptions.NotFoundException;
+import com.morganthen.employees_creator.common.exceptions.UnprocessableContentException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -39,6 +40,20 @@ public class GlobalExceptionHandler {
         ApiErrorResponse body = ApiErrorResponse.of(HttpStatus.BAD_REQUEST, "Validation failed",
                 req.getRequestURI(), details);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleConflict(ConflictException ex, HttpServletRequest req) {
+        ApiErrorResponse body = ApiErrorResponse.of(HttpStatus.CONFLICT, ex.getMessage(), req.getRequestURI());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(UnprocessableContentException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnprocessable(UnprocessableContentException ex,
+            HttpServletRequest req) {
+        ApiErrorResponse body = ApiErrorResponse.of(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(),
+                req.getRequestURI());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(body);
     }
 
 }

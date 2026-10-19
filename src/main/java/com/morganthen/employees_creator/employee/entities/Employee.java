@@ -93,6 +93,14 @@ public class Employee {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    public Employee() {
+
+    }
+
+    public boolean isOngoing() {
+        return endDate == null;
+    }
+
     public Long getId() {
         return id;
     }

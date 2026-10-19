@@ -2,12 +2,12 @@ package com.morganthen.employees_creator.employee;
 
 import java.util.List;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
+import com.morganthen.employees_creator.common.exceptions.ConflictException;
 import com.morganthen.employees_creator.common.exceptions.NotFoundException;
+import com.morganthen.employees_creator.common.exceptions.UnprocessableContentException;
 import com.morganthen.employees_creator.employee.dtos.CreateEmployeeRequest;
 import com.morganthen.employees_creator.employee.dtos.EmployeeResponse;
 import com.morganthen.employees_creator.employee.entities.Employee;
@@ -46,17 +46,17 @@ public class EmployeeService {
         // resolve role
         Role role = roleRepository.findById(req.roleId())
                 .orElseThrow(
-                        () -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown roleId: " + req.roleId()));
+                        () -> new UnprocessableContentException("Role not found"));
 
         // active-email check
         boolean emailExist = employeeRepository.existsByEmailAndArchivedAtIsNull(req.email());
         if (emailExist) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
+            throw new ConflictException("Email already in use");
         }
 
         // date rule
         if (req.endDate() != null && req.endDate().isBefore((req.startDate()))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date must be after start date");
+            throw new UnprocessableContentException("End date must be after start date");
         }
 
         // map DTO -> Employee, normalise mobile to +614... then save

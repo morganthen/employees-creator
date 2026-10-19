@@ -128,9 +128,12 @@ spring.jpa.hibernate.ddl-auto=update
 - [x] `CreateEmployeeRequest` record DTO with Bean Validation constraints
 - [x] Employee create + read endpoints (`POST /api/employees`, `GET /api/employees`, `GET /api/employees/{id}`)
 - [x] Bean Validation wired through the create endpoint (`@Valid`)
-- [x] Global exception handling: `@RestControllerAdvice` + `ApiErrorResponse` (not-found + `@Valid` validation errors)
+- [x] Global exception handling: `@RestControllerAdvice` + `ApiErrorResponse` (404 not-found · 400 `@Valid` · 409 conflict · 422 unprocessable)
+- [x] Custom domain exceptions: `NotFoundException` (404), `ConflictException` (409), `UnprocessableContentException` (422)
+- [x] `Employee.isOngoing()` derived entity logic + first unit test
 - [ ] Employee update + archive endpoints
-- [ ] React + TypeScript client (employee list slice in progress)
+- [ ] Service (Mockito) + end-to-end (RestAssured) tests · CI · Flyway migrations
+- [ ] React + TypeScript client (list + detail slices in progress)
 - [ ] Role dropdown fed from the API (client)
 
 ---
@@ -140,8 +143,9 @@ spring.jpa.hibernate.ddl-auto=update
 - No CI workflow yet, so the test badges above are placeholders until GitHub Actions is added.
 - Local dev connects as MySQL `root` with an empty password, read from `.env`. Set a real password and keep it out of version control before any non-local use.
 - Authentication/authorization is deferred, so `GET /api/roles` and the Swagger docs are currently public.
-- Exception handling is **partial**: `NotFoundException` and `@Valid` failures return the clean `ApiErrorResponse`, but `EmployeeService.create` still throws `ResponseStatusException` for its 400/409 cases (unknown role, duplicate email, bad dates), so those still render Spring's default error body. Pending: custom exceptions + handlers for the service rules, and a request logger/filter.
-- No tests or CI yet (test badges below are placeholders).
+- **`ddl-auto=validate` is set but there are no migrations yet.** Hibernate no longer creates/updates the schema, so a **fresh database has no tables** and any future entity change will fail the boot until **Flyway** is added. Migrations are the next infrastructure step.
+- Tests are minimal — one entity unit test (`EmployeeEntityTest`). Service (Mockito) and end-to-end (RestAssured) tests, plus CI, are pending.
+- No request logging/observability yet (the logging slice is pending).
 
 ---
 
@@ -210,6 +214,17 @@ spring.jpa.hibernate.ddl-auto=update
 - Added **global exception handling**: `@RestControllerAdvice` `GlobalExceptionHandler`, an `ApiErrorResponse` record (`timestamp/status/error/message/path/details`), a custom `NotFoundException`, and a `MethodArgumentNotValidException` handler that returns a field→messages `details` map. This replaced Spring's default leaky error body (which shipped a full `trace`).
 - Added `EmployeeSeeder`, seeding through `EmployeeService.create` (so seeded rows pass the real rules), guarded by `count() == 0`.
 
+**19/10/2026 - Custom Domain Exceptions, Entity Logic & Schema Validation**
+
+- Replaced `ResponseStatusException` in `EmployeeService.create` with **custom domain exceptions**, so the whole API returns one error shape:
+  - `ConflictException` → **409** (duplicate active email)
+  - `UnprocessableContentException` → **422** (unknown `roleId`, `endDate` before `startDate`)
+  - `NotFoundException` → **404** (already used by `findById`)
+- Added the matching `@ExceptionHandler`s to `GlobalExceptionHandler`. The write path now returns the same `ApiErrorResponse` as the read path — no more leaked stack traces.
+- Added derived entity logic `Employee.isOngoing()` (`endDate == null`) and an explicit no-arg constructor, plus the project's **first unit test** (`EmployeeEntityTest`, 2 cases).
+- Switched `application.properties` to `spring.datasource.url=${DB_URL}` (whole URL in `.env`, the nology convention) and `spring.jpa.hibernate.ddl-auto=validate`; added `.env.example`.
+- Began aligning the project with Alex's live-build reference `full_stack_todo` (Flyway migrations + a Mockito/RestAssured test harness are next).
+
 ---
 
 ## What did you struggle with?
@@ -260,6 +275,15 @@ spring.jpa.hibernate.ddl-auto=update
 - **Wrong auto-import (silent bug).** The IDE imported `org.springframework.data.crossstore.ChangeSetPersister.NotFoundException` instead of the project's own. It compiled, so the `@ExceptionHandler` silently never matched. Caught only by reading the import line.
 - **curl vs the browser.** Learned `curl` as a command-line HTTP client; for GETs the browser works too — but the API is on `:8080` under `/api/...`, while `:5173` is the Vite frontend, so testing `/employees/200` there wouldn't reach the API.
 - **Vertical slices.** Building front-to-back in thin slices (list → detail → actions) keeps each change small and testable — Alex's guidance, and it's holding up.
+
+**19/10/2026**
+
+- **Checked vs unchecked exceptions.** Worked out *why* `NotFoundException extends RuntimeException`: it must travel from the service to the `@RestControllerAdvice` without every method declaring `throws`, and unchecked exceptions trigger `@Transactional` rollback. A checked exception would force `throws` up the whole stack for no benefit.
+- **Choosing status codes by semantics.** Settled on 404 (absent resource) · 409 (unique-value clash) · 422 (well-formed but semantically invalid — unknown reference, bad date order) · 400 (syntactically bad). The lesson was picking the status that *means* the thing.
+- **Test behaviour, not data.** Realised an `XEntityTest` is only worth writing when the entity has *behaviour* (`isOngoing`) — testing getters/setters is testing the language. Mirrors Alex's `isOverdue`.
+- **A red test caught a real mistake.** `isOngoing_whenEndDateIsSet_isFalse` was written with `assertTrue` — the mismatch failed immediately, which is exactly the point of testing as you go.
+- **No-arg constructors (again).** An entity gets an implicit no-arg constructor *only* while it declares no constructors; adding the first convenience constructor removes it, so it must be re-declared for JPA — the `Role` trap, re-learned.
+- **`update` → `validate` has teeth.** Flipping the setting boots fine on a machine whose schema already matches, but a fresh DB (teammate/CI) has no tables, and any entity change fails the boot — which is why it's paired with Flyway.
 
 ---
 
