@@ -1,5 +1,5 @@
 import EmployeeDetails from "./components/EmployeeDetails";
-import EmployeeList from "./EmployeeList";
+import EmployeeList from "./pages/EmployeeList";
 import { Routes, Route } from "react-router";
 
 function App() {

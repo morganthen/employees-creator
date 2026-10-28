@@ -1,5 +1,6 @@
 package com.morganthen.employees_creator.employee;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -8,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -35,15 +37,15 @@ public class EmployeeServiceTest {
 
     @Test
     @DisplayName("archives an active employee")
-    void archived_whenActiveEmployeeFound_setsArchivedAtAndSaves() {
+    void archive_whenActiveEmployeeFound_setsArchivedAtAndSaves() {
         Employee employee = new Employee();
         given(employeeRepository.findByIdAndArchivedAtIsNull(1L)).willReturn(Optional.of(employee));
 
         employeeService.archive(1L);
-
-        assertNotNull(employee.getArchivedAt()); // state
-        verify(employeeRepository, times(1)).save(employee); // interaction
-
+        LocalDateTime before = LocalDateTime.now();
+        assertNotNull(employee.getArchivedAt());
+        assertFalse(employee.getArchivedAt().isBefore(before));
+        verify(employeeRepository, times(1)).save(employee);
     }
 
     @Test
@@ -53,6 +55,16 @@ public class EmployeeServiceTest {
 
         assertThrows(NotFoundException.class, () -> employeeService.archive(999L));
         verify(employeeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("throws NotFound when the employee is already archived")
+    void archive_whenEmployeeAlreadyArchived_throwsNotFound() {
+        given(employeeRepository.findByIdAndArchivedAtIsNull(1L))
+                .willReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> employeeService.archive(1L));
+        verify(employeeRepository, never()).save(any(Employee.class));
     }
 
 }

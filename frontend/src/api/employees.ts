@@ -39,3 +39,12 @@ export async function getEmployee(id: string): Promise<Employee> {
   }
   return res.json();
 }
+
+export async function archiveEmployee(id: string): Promise<void> {
+  const res = await fetch(`/api/employees/${id}`, { method: "DELETE" });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message ?? "Failed to archive employee");
+  }
+}

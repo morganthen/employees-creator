@@ -3,7 +3,7 @@ import type { Employee } from "../api/employees";
 
 type Props = { employee: Employee };
 
-function EmployeeCard({ employee }: Props) {
+export default function EmployeeCard({ employee }: Props) {
   const {
     id,
     firstName,
@@ -61,5 +61,3 @@ function EmployeeCard({ employee }: Props) {
     </li>
   );
 }
-
-export default EmployeeCard;

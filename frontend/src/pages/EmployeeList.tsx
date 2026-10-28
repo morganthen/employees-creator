@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { getEmployees } from "./api/employees";
-import EmployeeCard from "./components/EmployeeCard";
+import { getEmployees } from "../api/employees";
+import EmployeeCard from "../components/EmployeeCard";
 
 function EmployeeList() {
   const { isPending, error, data } = useQuery({
