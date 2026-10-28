@@ -1,5 +1,9 @@
-import { Link } from "react-router";
-import type { Employee } from "../api/employees";
+import { Link, useNavigate } from "react-router";
+import { archiveEmployee, type Employee } from "../api/employees";
+import CardMenu from "./CardMenu";
+import ConfirmDialog from "./ConfirmDialog";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 type Props = { employee: Employee };
 
@@ -16,16 +20,28 @@ export default function EmployeeCard({ employee }: Props) {
     startDate,
   } = employee;
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const archive = useMutation({
+    mutationFn: () => archiveEmployee(String(id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      setConfirmOpen(false);
+    },
+  });
+
   const statusStyles =
     employeeStatus === "PERMANENT"
       ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
       : "bg-amber-50 text-amber-700 ring-amber-600/20";
 
   return (
-    <li className="h-full">
+    <li className="relative h-full">
       <Link
         to={`/employees/${id}`}
-        className="block h-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md"
+        className="block h-full rounded-xl border border-gray-200 bg-white p-5 pr-12 shadow-sm transition hover:shadow-md"
       >
         <div className="min-w-0">
           <h2 className="truncate text-base font-semibold text-gray-900">
@@ -58,6 +74,25 @@ export default function EmployeeCard({ employee }: Props) {
           })}
         </p>
       </Link>
+
+      <div className="absolute right-3 top-3 z-10">
+        <CardMenu
+          onView={() => navigate(`/employees/${id}`)}
+          onArchive={() => setConfirmOpen(true)}
+        />
+      </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={`Archive ${firstName} ${lastName}?`}
+        description="They'll be hidden from the employee list. You can't undo this from the UI."
+        confirmLabel="Archive"
+        isPending={archive.isPending}
+        onConfirm={() => archive.mutate()}
+        onCancel={() => {
+          if (!archive.isPending) setConfirmOpen(false);
+        }}
+      />
     </li>
   );
 }

@@ -22,7 +22,7 @@ export default function ConfirmDialog({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isPending) onCance();
+      if (e.key === "Escape" && !isPending) onCancel();
     };
 
     document.addEventListener("keydown", onKey);
