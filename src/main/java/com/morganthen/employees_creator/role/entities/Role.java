@@ -26,7 +26,7 @@ public class Role {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    protected Role() {
+    public Role() {
     }
 
     public Role(String name) {

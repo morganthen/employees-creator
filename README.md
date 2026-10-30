@@ -132,10 +132,13 @@ spring.jpa.hibernate.ddl-auto=update
 - [x] Custom domain exceptions: `NotFoundException` (404), `ConflictException` (409), `UnprocessableContentException` (422)
 - [x] `Employee.isOngoing()` derived entity logic + first unit test
 - [x] Employee archive (soft delete) — `DELETE /api/employees/{id}` → 204
-- [x] First service unit tests (`EmployeeServiceTest`, Mockito) — archive slice
-- [ ] Employee update endpoint (`PUT /api/employees/{id}`)
+- [x] Frontend archive flow — kebab menu + confirm dialog + React Query invalidation
+- [x] Service unit tests (`EmployeeServiceTest`, Mockito) — archive + create (11 cases)
+- [x] Controller tests (`EmployeeControllerTest`, `@WebMvcTest` + MockMvc) — 8 cases
+- [ ] Employee update endpoint (`PUT`/`PATCH /api/employees/{id}`)
+- [ ] Create/edit form (client)
 - [ ] End-to-end (RestAssured) tests · CI · Flyway migrations
-- [ ] React + TypeScript client (list + detail slices in progress)
+- [ ] React + TypeScript client — list, detail and archive done; create/edit pending
 - [ ] Role dropdown fed from the API (client)
 
 ---
@@ -146,7 +149,7 @@ spring.jpa.hibernate.ddl-auto=update
 - Local dev connects as MySQL `root` with an empty password, read from `.env`. Set a real password and keep it out of version control before any non-local use.
 - Authentication/authorization is deferred, so `GET /api/roles` and the Swagger docs are currently public.
 - **`ddl-auto=validate` is set but there are no migrations yet.** Hibernate no longer creates/updates the schema, so a **fresh database has no tables** and any future entity change will fail the boot until **Flyway** is added. Migrations are the next infrastructure step.
-- Tests are minimal — one entity unit test (`EmployeeEntityTest`). Service (Mockito) and end-to-end (RestAssured) tests, plus CI, are pending.
+- Tests cover the entity (2), `EmployeeService` (11) and `EmployeeController` (8) — 22 total; no end-to-end (RestAssured) or frontend tests yet, and no CI.
 - No request logging/observability yet (the logging slice is pending).
 
 ---
@@ -233,6 +236,27 @@ spring.jpa.hibernate.ddl-auto=update
 - Because the list query is active-only, archived employees disappear from `GET /api/employees` automatically.
 - Added the project's **first service unit test** (`EmployeeServiceTest`, Mockito): success path (sets `archivedAt` + calls `save`) and not-found path (throws `NotFoundException`, never saves).
 
+**28/10/2026 - Frontend Archive Flow**
+
+- Added `archiveEmployee(id)` to the API module: `DELETE /api/employees/{id}`, no body, 204 treated as success, server error body parsed for the message.
+- Built `ConfirmDialog` — `role="dialog"`, `aria-modal`, Escape/backdrop close, and a pending state that disables both buttons.
+- Restructured `EmployeeCard`: the card stays a `<Link>`, but `CardMenu` is now a **sibling positioned above it** (`relative` `li` + `absolute` menu), so Archive no longer triggers navigation. Wired the previously-unused `CardMenu`.
+- Wired `useMutation` + `queryClient.invalidateQueries({ queryKey: ["employees"] })`, so a 204 refetches the list and the archived card disappears without a reload.
+- Moved `EmployeeList` into `src/pages/`.
+- Verified end-to-end in the browser: kebab → Archive → confirm → `DELETE` 204 → `GET /api/employees` refetch. Test employees created via Postman.
+
+**30/10/2026 - Create Service & Controller Tests**
+
+- Expanded `EmployeeServiceTest` from 3 to **11 cases**:
+  - create happy path — role resolved, saved entity captured, mobile normalised, response mapped
+  - unknown role → `UnprocessableContentException` (also asserts the email check and `save` never run)
+  - duplicate active email → `ConflictException`
+  - `endDate` before `startDate` → `UnprocessableContentException`
+  - `@ParameterizedTest` for mobile normalisation: `0412…`, `+61412…`, `61412…`, `0412 345 678`
+- Added `EmployeeControllerTest` (`@WebMvcTest`, **8 cases**): POST 201/400/409/422, DELETE 204/404, GET 200/404 — exercising the controller, Bean Validation and `GlobalExceptionHandler` together.
+- Extracted `validRequest()` / `requestWithMobile()` / `requestWithDates()` helpers so the 16-field `CreateEmployeeRequest` isn't repeated.
+- Fixed the archive timestamp assertion: `before` was captured after `archive()`, so the lower bound was inverted.
+
 ---
 
 ## What did you struggle with?
@@ -300,6 +324,26 @@ spring.jpa.hibernate.ddl-auto=update
 - **`new Employee()` is a real but empty object.** No id, no data — which is fine, because `archive` only needs something to stamp and save. Fake the **collaborators** (repos); use real (if empty) **domain objects**.
 - **`@Transactional` in plain English.** Wraps the method in one all-or-nothing DB transaction — commit on a normal return, roll back on a `RuntimeException` — and keeps the persistence context open so lazy loading and dirty checking work.
 - **204 + `ResponseEntity.noContent().build()`.** Delete has no payload to return; success is signalled by the status code, not a body.
+
+**28/10/2026**
+
+- **A button inside an anchor.** Dropping the kebab menu inside the card's `<Link>` meant "Archive" also navigated to the detail page (and `<button>` inside `<a>` is invalid HTML). Fixed by making the menu a sibling with `absolute` positioning and `z-10`, and adding `pr-12` to the Link so the title clears it.
+- **`async` functions can't return `void`.** `archiveEmployee(id): void` doesn't compile — an async function always returns `Promise<T>`, so it must be `Promise<void>`.
+- **A header string with quotes inside it.** `'Content-Type: "application/json"'` is one malformed header, not a key/value pair. A DELETE with no body doesn't need `Content-Type` at all.
+- **State written but never read.** `confirmOpen` and `archive` were flagged by `tsc` because the dialog was never rendered — `noUnusedLocals` caught a wiring gap, not just tidiness.
+- **Two router packages.** `react-router` v8 and `react-router-dom` v7 are both installed; the code imports from `react-router`, so the duplicate is dead weight.
+- **React Query invalidation.** After a 204, nothing changes on screen until the `["employees"]` query is invalidated; the mutating card doesn't own the list.
+
+**30/10/2026**
+
+- **A "before" captured after the action.** `archive()` set `archivedAt`, then the test captured `now` and asserted `archivedAt` was not before it — always true. A lower-bound timestamp must be captured *before* the call it bounds.
+- **Testing branch order, not just outcomes.** Because the service resolves the role first, the unknown-role test also asserts `existsByEmail…` and `save` are never called — proving the short-circuit, not only the exception.
+- **Private methods are tested through the public API.** `normalizeMobile` is private, so the parameterised test calls `create()` and captures the saved entity to inspect the stored number.
+- **Factories beat copy-paste.** Three small helpers (`validRequest`, `requestWithMobile`, `requestWithDates`) keep the 16-field record readable; a builder is the next step if variants multiply.
+- **Spring Boot 4 uses Jackson 3.** `@Autowired ObjectMapper` failed with *"No qualifying bean of type com.fasterxml.jackson.databind.ObjectMapper"* — Boot 4 auto-configures `tools.jackson`, not Jackson 2. The controller test doesn't need it: send raw JSON strings.
+- **`@MockitoBean`, not `@MockBean`.** Spring Framework 7 replaced the deprecated `@MockBean`; the import is `org.springframework.test.context.bean.override.mockito.MockitoBean`.
+- **What `@WebMvcTest` actually loads.** The controller, `@RestControllerAdvice` and web config — not `@Service`/`@Repository`. That's why the service must be mocked, and why the 409/422/404 tests exercise the real `GlobalExceptionHandler`.
+- **422 was renamed.** Spring 6.2+ calls it `UNPROCESSABLE_CONTENT` (`UNPROCESSABLE_ENTITY` is deprecated); `status().is(422)` avoids the API churn.
 
 ---
 
