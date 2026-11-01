@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.morganthen.employees_creator.common.exceptions.ConflictException;
 import com.morganthen.employees_creator.common.exceptions.NotFoundException;
 import com.morganthen.employees_creator.common.exceptions.UnprocessableContentException;
-import com.morganthen.employees_creator.employee.dtos.CreateEmployeeRequest;
+import com.morganthen.employees_creator.employee.dtos.EmployeeRequest;
 import com.morganthen.employees_creator.employee.dtos.EmployeeResponse;
 import com.morganthen.employees_creator.employee.entities.Employee;
 import com.morganthen.employees_creator.role.RoleRepository;
@@ -42,7 +42,7 @@ public class EmployeeService {
     }
 
     @Transactional
-    public EmployeeResponse create(CreateEmployeeRequest req) {
+    public EmployeeResponse create(EmployeeRequest req) {
 
         // resolve role
         Role role = roleRepository.findById(req.roleId())
@@ -56,32 +56,64 @@ public class EmployeeService {
         }
 
         // date rule
-        if (req.endDate() != null && req.endDate().isBefore((req.startDate()))) {
-            throw new UnprocessableContentException("End date must be after start date");
-        }
+        validateDates(req);
 
         // map DTO -> Employee, normalise mobile to +614... then save
         Employee e = new Employee();
-        e.setRole(role);
-        e.setFirstName(req.firstName());
-        e.setMiddleName(req.middleName());
-        e.setLastName(req.lastName());
-        e.setEmail(req.email());
-        e.setMobileNumber(normalizeMobile(req.mobileNumber()));
-        e.setAddressLine1(req.addressLine1());
-        e.setAddressLine2(req.addressLine2());
-        e.setSuburb(req.suburb());
-        e.setState(req.state());
-        e.setPostcode(req.postcode());
-        e.setEmployeeStatus(req.employeeStatus());
-        e.setStartDate(req.startDate());
-        e.setEndDate(req.endDate());
-        e.setEmploymentType(req.employmentType());
-        e.setHoursPerWeek(req.hoursPerWeek());
+        applyRequest(e, req, role);
         // save to repo
         Employee saved = employeeRepository.save(e);
         return EmployeeResponse.of(saved);
 
+    }
+
+    @Transactional
+    public EmployeeResponse update(Long id, EmployeeRequest req) {
+
+        Employee employee = employeeRepository.findByIdAndArchivedAtIsNull(id)
+                .orElseThrow(() -> new NotFoundException("Employee not found: " + id));
+
+        Role role = roleRepository.findById(req.roleId())
+                .orElseThrow(
+                        () -> new UnprocessableContentException("Role not found"));
+
+        // same email on the same employee is fine; taken by someone else is not
+        boolean emailTakenByAnother = employeeRepository
+                .existsByEmailAndArchivedAtIsNullAndIdNot(req.email(), id);
+        if (emailTakenByAnother) {
+            throw new ConflictException("Email already in use");
+        }
+
+        validateDates(req);
+
+        applyRequest(employee, req, role);
+        Employee saved = employeeRepository.save(employee);
+        return EmployeeResponse.of(saved);
+    }
+
+    private void validateDates(EmployeeRequest req) {
+        if (req.endDate() != null && req.endDate().isBefore(req.startDate())) {
+            throw new UnprocessableContentException("End date must be after start date");
+        }
+    }
+
+    private void applyRequest(Employee employee, EmployeeRequest req, Role role) {
+        employee.setRole(role);
+        employee.setFirstName(req.firstName());
+        employee.setMiddleName(req.middleName());
+        employee.setLastName(req.lastName());
+        employee.setEmail(req.email());
+        employee.setMobileNumber(normalizeMobile(req.mobileNumber()));
+        employee.setAddressLine1(req.addressLine1());
+        employee.setAddressLine2(req.addressLine2());
+        employee.setSuburb(req.suburb());
+        employee.setState(req.state());
+        employee.setPostcode(req.postcode());
+        employee.setEmployeeStatus(req.employeeStatus());
+        employee.setStartDate(req.startDate());
+        employee.setEndDate(req.endDate());
+        employee.setEmploymentType(req.employmentType());
+        employee.setHoursPerWeek(req.hoursPerWeek());
     }
 
     @Transactional(readOnly = true)

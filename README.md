@@ -8,7 +8,7 @@
 ## Demo & Snippets
 
 - **Hosted Link:** TBD (deployment target: AWS, RDS + Elastic Beanstalk/EC2)
-- **App Preview:** TBD once the client app exists. Add screenshots to `./docs/images/`.
+- **App Preview:** client app exists (list, detail, create, edit); screenshots still to be added to `./docs/images/`.
 
 ---
 
@@ -21,15 +21,16 @@ Employees Creator is a full-stack employee records system. Users can create and 
 ### Tech Stack
 
 - **Backend:** Java 17, Spring Boot 4.1.1, Spring Data JPA, MySQL, Bean Validation, Maven.
-- **Frontend (planned):** React, TypeScript, Vite, React Query, React Router, Tailwind CSS.
-- **Testing & Tools:** JUnit, Mockito, REST Assured, Vitest, React Testing Library, Git, GitHub Actions, OpenAPI/Swagger.
+- **Frontend:** React 19, TypeScript, Vite, React Query, React Router, Tailwind CSS, zod.
+- **Testing & Tools:** JUnit, Mockito (in use); REST Assured, Vitest, React Testing Library (planned); Git, GitHub Actions, OpenAPI/Swagger.
 
 **Why this stack?**
 
 - **Java & Spring Boot:** the mainstream stack for Australian backend roles, and a framework that makes layered architecture (controller, service, repository) explicit.
 - **MySQL & Spring Data JPA:** real relational modelling with foreign keys, constraints and referential integrity.
 - **Bean Validation:** structural validation at the DTO boundary, kept in one place.
-- **React & TypeScript:** a type-safe client that consumes the REST API (planned).
+- **React & TypeScript:** a type-safe client that consumes the REST API.
+- **zod on the client:** one declarative schema validates the form and produces the payload, mirroring the backend's Bean Validation rules without duplicating them by hand.
 
 ### Database Schema
 
@@ -71,7 +72,26 @@ Two tables: `employee` and `role`, joined N:1 (`employee.role_id` to `role.id`).
    ./mvnw test
    ```
 
-5. Once running, the API is available at `http://localhost:8080`, and Swagger UI at `http://localhost:8080/swagger-ui/index.html` (once springdoc-openapi is added).
+5. Once running, the API is available at `http://localhost:8080`, and Swagger UI at `http://localhost:8080/swagger-ui/index.html`.
+
+### Frontend Setup
+
+1. In a second terminal, install and run the client (it proxies `/api` to `localhost:8080`):
+
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+2. The app is served at `http://localhost:5173` — list, detail, create (`/employees/new`) and edit (`/employees/:id/edit`).
+
+3. Type-check, lint and build:
+
+   ```bash
+   npm run build   # tsc -b && vite build
+   npm run lint
+   ```
 
 ---
 
@@ -102,7 +122,7 @@ spring.config.import=optional:file:.env[.properties]
 spring.datasource.url=jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?createDatabaseIfNotExist=true
 spring.datasource.username=${DB_USER}
 spring.datasource.password=${DB_PASSWORD}
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=validate
 ```
 
 ---
@@ -114,6 +134,8 @@ spring.jpa.hibernate.ddl-auto=update
 - **DTO boundary.** Entities are never serialized directly. Requests carry Bean Validation; responses are shaped for the client.
 - **Archive over delete.** Records carry an `archived_at` timestamp so employment history is preserved. Email uniqueness applies to active rows only.
 - **Roles as a lookup table.** Roles change without a code deploy and feed the form dropdown through `GET /api/roles`.
+- **One form, two modes.** Create and edit render the same `EmployeeForm`; the page decides only which mutation to fire, so the two flows cannot diverge.
+- **Validation mirrors, never replaces.** The zod schema gives instant feedback client-side; the backend re-validates every request and remains the only authority.
 - **AU-only address handling.** Australian mobile format, AU states and 4-digit postcodes. No country column.
 - **Hand-rolled over generated.** No Lombok. Entities use explicit accessors and mappers; API-boundary DTOs are Java 17 records, so every pattern can still be explained.
 
@@ -125,7 +147,7 @@ spring.jpa.hibernate.ddl-auto=update
 - [x] `role` lookup entity, repository, service, DTO, controller (`GET /api/roles`) and seeder
 - [x] OpenAPI/Swagger via springdoc
 - [x] `employee` entity, `EmployeeStatus`/`EmploymentType` enums and repository
-- [x] `CreateEmployeeRequest` record DTO with Bean Validation constraints
+- [x] `EmployeeRequest` record DTO with Bean Validation constraints (shared by create and update)
 - [x] Employee create + read endpoints (`POST /api/employees`, `GET /api/employees`, `GET /api/employees/{id}`)
 - [x] Bean Validation wired through the create endpoint (`@Valid`)
 - [x] Global exception handling: `@RestControllerAdvice` + `ApiErrorResponse` (404 not-found · 400 `@Valid` · 409 conflict · 422 unprocessable)
@@ -133,13 +155,12 @@ spring.jpa.hibernate.ddl-auto=update
 - [x] `Employee.isOngoing()` derived entity logic + first unit test
 - [x] Employee archive (soft delete) — `DELETE /api/employees/{id}` → 204
 - [x] Frontend archive flow — kebab menu + confirm dialog + React Query invalidation
-- [x] Service unit tests (`EmployeeServiceTest`, Mockito) — archive + create (11 cases)
-- [x] Controller tests (`EmployeeControllerTest`, `@WebMvcTest` + MockMvc) — 8 cases
-- [ ] Employee update endpoint (`PUT`/`PATCH /api/employees/{id}`)
-- [ ] Create/edit form (client)
+- [x] Employee update endpoint — `PUT /api/employees/{id}` → 200 (re-validates the full record; email uniqueness excludes self)
+- [x] Service unit tests (`EmployeeServiceTest`, Mockito) — archive + create + update (16 cases)
+- [x] Controller tests (`EmployeeControllerTest`, `@WebMvcTest` + MockMvc) — 13 cases
+- [x] Create/edit form (client) — one shared `EmployeeForm`, zod schema as the validation source of truth
+- [x] Role dropdown fed from the API (client)
 - [ ] End-to-end (RestAssured) tests · CI · Flyway migrations
-- [ ] React + TypeScript client — list, detail and archive done; create/edit pending
-- [ ] Role dropdown fed from the API (client)
 
 ---
 
@@ -149,7 +170,8 @@ spring.jpa.hibernate.ddl-auto=update
 - Local dev connects as MySQL `root` with an empty password, read from `.env`. Set a real password and keep it out of version control before any non-local use.
 - Authentication/authorization is deferred, so `GET /api/roles` and the Swagger docs are currently public.
 - **`ddl-auto=validate` is set but there are no migrations yet.** Hibernate no longer creates/updates the schema, so a **fresh database has no tables** and any future entity change will fail the boot until **Flyway** is added. Migrations are the next infrastructure step.
-- Tests cover the entity (2), `EmployeeService` (11) and `EmployeeController` (8) — 22 total; no end-to-end (RestAssured) or frontend tests yet, and no CI.
+- Tests cover the entity (2), `EmployeeService` (16) and `EmployeeController` (13) — 32 total including the context load; no end-to-end (RestAssured) or frontend tests yet, and no CI.
+- Both `react-router` v8 and `react-router-dom` v7 are installed; the code imports from `react-router`, so the second package is dead weight and should be removed.
 - No request logging/observability yet (the logging slice is pending).
 
 ---
@@ -257,6 +279,18 @@ spring.jpa.hibernate.ddl-auto=update
 - Extracted `validRequest()` / `requestWithMobile()` / `requestWithDates()` helpers so the 16-field `CreateEmployeeRequest` isn't repeated.
 - Fixed the archive timestamp assertion: `before` was captured after `archive()`, so the lower bound was inverted.
 
+**02/11/2026 - Update Endpoint + Shared Create/Edit Form**
+
+- Added `PUT /api/employees/{id}` → 200. Update re-runs every create rule (role exists, end date ≥ start date) and re-checks email uniqueness with `existsByEmailAndArchivedAtIsNullAndIdNot`, so an employee can keep their own email.
+- Extracted the field mapping into `applyRequest(...)` and the date rule into `validateDates(...)`, so create and update cannot drift apart.
+- Renamed `CreateEmployeeRequest` → `EmployeeRequest`; both endpoints take the same payload shape.
+- Client: extracted the shared `EmployeeForm`, added `EditEmployee` at `/employees/:id/edit` (edit entry points on the detail page and the card kebab menu) and prefilled it from the fetched record.
+- Client validation moved to one zod schema (`lib/employeeSchema.ts`): `.safeParse` on submit, issues mapped to one message per field via `toFieldErrors`. This replaces the hand-rolled `validate()`; the backend still re-validates.
+- Dates use native `<input type="date">` — no picker dependency. Values are `YYYY-MM-DD`, the same string the API and MySQL use, so prefill needs no parsing. The end-date input carries `min={startDate}` so the picker greys out impossible ranges alongside the zod and service checks.
+- Archive failures now surface: `toApiError()` parses the `ApiErrorResponse` body into an `ApiError` (status + field `details`), instead of the old silent `throw new Error(...)`.
+- Server rejections map back onto the right field: 400 `details` → per-field messages, 409 → email. Derived during render (not in an effect) so `react-hooks/set-state-in-effect` stays clean.
+- Tests: `EmployeeServiceTest` 11 → 16, `EmployeeControllerTest` 8 → 13 (PUT 200/400/404/409/422).
+
 ---
 
 ## What did you struggle with?
@@ -343,6 +377,14 @@ spring.jpa.hibernate.ddl-auto=update
 - **Spring Boot 4 uses Jackson 3.** `@Autowired ObjectMapper` failed with *"No qualifying bean of type com.fasterxml.jackson.databind.ObjectMapper"* — Boot 4 auto-configures `tools.jackson`, not Jackson 2. The controller test doesn't need it: send raw JSON strings.
 - **`@MockitoBean`, not `@MockBean`.** Spring Framework 7 replaced the deprecated `@MockBean`; the import is `org.springframework.test.context.bean.override.mockito.MockitoBean`.
 - **What `@WebMvcTest` actually loads.** The controller, `@RestControllerAdvice` and web config — not `@Service`/`@Repository`. That's why the service must be mocked, and why the 409/422/404 tests exercise the real `GlobalExceptionHandler`.
+
+**02/11/2026**
+
+- **Hand-rolled validation doesn't scale.** The first create form grew a 60-line `validate()` with a required-fields tuple, three regexes and a cross-field date check. Replacing it with one zod schema deleted all of that and made the rules declarative and reusable.
+- **A schema with `.transform()` has two types.** `z.input` is the form shape (all strings); the parsed output is the payload. Typing the form state with `z.input` keeps the inputs honest — the conversion to numbers and `null`s happens once, in `toPayload`.
+- **`.pipe()` doesn't short-circuit.** `required("Email").pipe(z.email(...))` reports both "required" and "invalid email" for an empty input, so `toFieldErrors` keeps only the first issue per field.
+- **Don't map server errors in an effect.** Setting state from `useEffect` on `apiError` tripped `react-hooks/set-state-in-effect`; deriving the error state during render and tracking a "dismissed" error instance is simpler and avoids a cascading render.
+- **Updating an email means ignoring yourself.** Reusing `existsByEmailAndArchivedAtIsNull` on update would reject an employee saving their own record; `existsByEmailAndArchivedAtIsNullAndIdNot` is the rule the UI implies.
 - **422 was renamed.** Spring 6.2+ calls it `UNPROCESSABLE_CONTENT` (`UNPROCESSABLE_ENTITY` is deprecated); `status().is(422)` avoids the API churn.
 
 ---
@@ -355,6 +397,6 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Further details, related projects, reimplementations
 
-- **Backend API:** Spring Boot REST API serving employee and role endpoints (in progress).
-- **Frontend Application:** React + TypeScript single-page app consuming the REST endpoints (in progress — employee list slice first).
+- **Backend API:** Spring Boot REST API serving employee and role endpoints — create, read, update (full replace) and archive (soft delete).
+- **Frontend Application:** React + TypeScript single-page app consuming the REST endpoints — list, detail, create, edit and archive, with zod-validated forms. Automated frontend tests and CI are the next step.
 - **Related project:** extends the patterns from an earlier Spring Boot build, the Java + React To Do API (https://github.com/morganthen/rmndr): layered controllers, services, repositories, DTOs, soft delete, OpenAPI.

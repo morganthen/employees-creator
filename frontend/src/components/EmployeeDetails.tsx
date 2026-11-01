@@ -54,6 +54,12 @@ function EmployeeDetails() {
           >
             {data.employeeStatus === "PERMANENT" ? "Permanent" : "Contract"}
           </span>
+          <Link
+            to={`/employees/${id}/edit`}
+            className="shrink-0 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Edit
+          </Link>
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2">

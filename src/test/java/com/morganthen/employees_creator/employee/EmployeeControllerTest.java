@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -23,7 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.morganthen.employees_creator.common.exceptions.ConflictException;
 import com.morganthen.employees_creator.common.exceptions.NotFoundException;
 import com.morganthen.employees_creator.common.exceptions.UnprocessableContentException;
-import com.morganthen.employees_creator.employee.dtos.CreateEmployeeRequest;
+import com.morganthen.employees_creator.employee.dtos.EmployeeRequest;
 import com.morganthen.employees_creator.employee.dtos.EmployeeResponse;
 import com.morganthen.employees_creator.employee.entities.Employee;
 import com.morganthen.employees_creator.role.entities.Role;
@@ -60,7 +61,7 @@ class EmployeeControllerTest {
     @Test
     @DisplayName("POST returns 201 and the created employee")
     void create_whenRequestValid_returns201() throws Exception {
-        given(employeeService.create(any(CreateEmployeeRequest.class)))
+        given(employeeService.create(any(EmployeeRequest.class)))
                 .willReturn(employeeResponse());
 
         mockMvc.perform(post("/api/employees")
@@ -106,7 +107,7 @@ class EmployeeControllerTest {
     @DisplayName("POST returns 409 when the email is already in use")
     void create_whenEmailActive_returns409() throws Exception {
         willThrow(new ConflictException("Email already in use"))
-                .given(employeeService).create(any(CreateEmployeeRequest.class));
+                .given(employeeService).create(any(EmployeeRequest.class));
 
         mockMvc.perform(post("/api/employees")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -119,9 +120,92 @@ class EmployeeControllerTest {
     @DisplayName("POST returns 422 when the role does not exist")
     void create_whenRoleMissing_returns422() throws Exception {
         willThrow(new UnprocessableContentException("Role not found"))
-                .given(employeeService).create(any(CreateEmployeeRequest.class));
+                .given(employeeService).create(any(EmployeeRequest.class));
 
         mockMvc.perform(post("/api/employees")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_REQUEST_JSON))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.message").value("Role not found"));
+    }
+
+    // -------------------------------------------------------------------- PUT
+
+    @Test
+    @DisplayName("PUT returns 200 and the updated employee")
+    void update_whenRequestValid_returns200() throws Exception {
+        given(employeeService.update(any(Long.class), any(EmployeeRequest.class)))
+                .willReturn(employeeResponse());
+
+        mockMvc.perform(put("/api/employees/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_REQUEST_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.firstName").value("Jane"));
+    }
+
+    @Test
+    @DisplayName("PUT returns 400 with field details when validation fails")
+    void update_whenRequestInvalid_returns400WithDetails() throws Exception {
+        String invalidJson = """
+                {
+                  "firstName": "",
+                  "roleId": 1,
+                  "lastName": "Doe",
+                  "email": "not-an-email",
+                  "mobileNumber": "0412345678",
+                  "addressLine1": "1 Test St",
+                  "suburb": "Melbourne",
+                  "state": "VIC",
+                  "postcode": "3000",
+                  "employeeStatus": "PERMANENT",
+                  "startDate": "2026-01-15",
+                  "employmentType": "FULL_TIME",
+                  "hoursPerWeek": 38
+                }
+                """;
+
+        mockMvc.perform(put("/api/employees/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(invalidJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.firstName").exists())
+                .andExpect(jsonPath("$.details.email").exists());
+    }
+
+    @Test
+    @DisplayName("PUT returns 404 when the employee does not exist")
+    void update_whenEmployeeMissing_returns404() throws Exception {
+        willThrow(new NotFoundException("Employee not found: 999"))
+                .given(employeeService).update(any(Long.class), any(EmployeeRequest.class));
+
+        mockMvc.perform(put("/api/employees/999")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_REQUEST_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Employee not found: 999"));
+    }
+
+    @Test
+    @DisplayName("PUT returns 409 when the email is taken by another employee")
+    void update_whenEmailTakenByAnother_returns409() throws Exception {
+        willThrow(new ConflictException("Email already in use"))
+                .given(employeeService).update(any(Long.class), any(EmployeeRequest.class));
+
+        mockMvc.perform(put("/api/employees/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_REQUEST_JSON))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("PUT returns 422 when the role does not exist")
+    void update_whenRoleMissing_returns422() throws Exception {
+        willThrow(new UnprocessableContentException("Role not found"))
+                .given(employeeService).update(any(Long.class), any(EmployeeRequest.class));
+
+        mockMvc.perform(put("/api/employees/1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(VALID_REQUEST_JSON))
                 .andExpect(status().is(422))

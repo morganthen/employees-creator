@@ -78,6 +78,7 @@ export default function EmployeeCard({ employee }: Props) {
       <div className="absolute right-3 top-3 z-10">
         <CardMenu
           onView={() => navigate(`/employees/${id}`)}
+          onEdit={() => navigate(`/employees/${id}/edit`)}
           onArchive={() => setConfirmOpen(true)}
         />
       </div>

@@ -11,6 +11,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     boolean existsByEmailAndArchivedAtIsNull(String email);
 
+    boolean existsByEmailAndArchivedAtIsNullAndIdNot(String email, Long id);
+
     List<Employee> findByArchivedAtIsNull();
 
     Optional<Employee> findByIdAndArchivedAtIsNull(Long id);

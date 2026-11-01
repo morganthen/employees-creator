@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 type CardMenuProps = {
   onView: () => void;
+  onEdit: () => void;
   onArchive: () => void;
 };
 
@@ -13,7 +14,7 @@ const KebabIcon = () => (
   </svg>
 );
 
-function CardMenu({ onView, onArchive }: CardMenuProps) {
+function CardMenu({ onView, onEdit, onArchive }: CardMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -59,6 +60,16 @@ function CardMenu({ onView, onArchive }: CardMenuProps) {
             className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50"
           >
             View details
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => {
+              setIsOpen(false);
+              onEdit();
+            }}
+            className="block w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50"
+          >
+            Edit
           </button>
           <button
             role="menuitem"

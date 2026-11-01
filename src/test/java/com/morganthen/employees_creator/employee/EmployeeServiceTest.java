@@ -30,7 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.morganthen.employees_creator.common.exceptions.ConflictException;
 import com.morganthen.employees_creator.common.exceptions.NotFoundException;
 import com.morganthen.employees_creator.common.exceptions.UnprocessableContentException;
-import com.morganthen.employees_creator.employee.dtos.CreateEmployeeRequest;
+import com.morganthen.employees_creator.employee.dtos.EmployeeRequest;
 import com.morganthen.employees_creator.employee.dtos.EmployeeResponse;
 import com.morganthen.employees_creator.employee.entities.Employee;
 import com.morganthen.employees_creator.role.RoleRepository;
@@ -142,7 +142,7 @@ public class EmployeeServiceTest {
         given(employeeRepository.existsByEmailAndArchivedAtIsNull("jane@example.com"))
                 .willReturn(false);
 
-        CreateEmployeeRequest request = requestWithDates(
+        EmployeeRequest request = requestWithDates(
                 LocalDate.of(2026, 2, 1),
                 LocalDate.of(2026, 1, 1));
 
@@ -174,14 +174,104 @@ public class EmployeeServiceTest {
         assertEquals(expected, captor.getValue().getMobileNumber());
     }
 
+    // ------------------------------------------------------------------- update
+
+    @Test
+    @DisplayName("updates an active employee and returns the new state")
+    void update_whenEmployeeFound_appliesChangesAndSaves() {
+        Employee employee = existingEmployee();
+        Role role = new Role();
+        given(employeeRepository.findByIdAndArchivedAtIsNull(1L))
+                .willReturn(Optional.of(employee));
+        given(roleRepository.findById(1)).willReturn(Optional.of(role));
+        given(employeeRepository.existsByEmailAndArchivedAtIsNullAndIdNot("jane@example.com", 1L))
+                .willReturn(false);
+        given(employeeRepository.save(any(Employee.class)))
+                .willAnswer(inv -> inv.getArgument(0));
+
+        EmployeeResponse res = employeeService.update(1L, requestWithMobile("0498765432"));
+
+        assertAll(
+                () -> assertEquals("+61498765432", employee.getMobileNumber()),
+                () -> assertEquals(role, employee.getRole()),
+                () -> assertEquals("+61498765432", res.mobileNumber()));
+        verify(employeeRepository, times(1)).save(employee);
+    }
+
+    @Test
+    @DisplayName("throws NotFound when updating an employee that does not exist")
+    void update_whenEmployeeMissing_throwsNotFound() {
+        given(employeeRepository.findByIdAndArchivedAtIsNull(999L))
+                .willReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> employeeService.update(999L, validRequest()));
+
+        verify(employeeRepository, never()).save(any(Employee.class));
+    }
+
+    @Test
+    @DisplayName("throws Conflict when the email belongs to another employee")
+    void update_whenEmailTakenByAnother_throwsConflict() {
+        given(employeeRepository.findByIdAndArchivedAtIsNull(1L))
+                .willReturn(Optional.of(existingEmployee()));
+        given(roleRepository.findById(1)).willReturn(Optional.of(new Role()));
+        given(employeeRepository.existsByEmailAndArchivedAtIsNullAndIdNot("jane@example.com", 1L))
+                .willReturn(true);
+
+        assertThrows(ConflictException.class,
+                () -> employeeService.update(1L, validRequest()));
+
+        verify(employeeRepository, never()).save(any(Employee.class));
+    }
+
+    @Test
+    @DisplayName("throws NotFound when updating an archived employee")
+    void update_whenEmployeeArchived_throwsNotFound() {
+        given(employeeRepository.findByIdAndArchivedAtIsNull(1L))
+                .willReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> employeeService.update(1L, validRequest()));
+    }
+
+    @Test
+    @DisplayName("throws UnprocessableContent when the updated end date precedes the start date")
+    void update_whenEndDateBeforeStartDate_throwsUnprocessableContent() {
+        given(employeeRepository.findByIdAndArchivedAtIsNull(1L))
+                .willReturn(Optional.of(existingEmployee()));
+        given(roleRepository.findById(1)).willReturn(Optional.of(new Role()));
+        given(employeeRepository.existsByEmailAndArchivedAtIsNullAndIdNot("jane@example.com", 1L))
+                .willReturn(false);
+
+        EmployeeRequest request = requestWithDates(
+                LocalDate.of(2026, 2, 1),
+                LocalDate.of(2026, 1, 1));
+
+        assertThrows(UnprocessableContentException.class,
+                () -> employeeService.update(1L, request));
+
+        verify(employeeRepository, never()).save(any(Employee.class));
+    }
+
     // ------------------------------------------------------------------ helpers
 
-    private static CreateEmployeeRequest validRequest() {
+    private static Employee existingEmployee() {
+        Employee employee = new Employee();
+        employee.setFirstName("Jane");
+        employee.setLastName("Doe");
+        employee.setEmail("jane@example.com");
+        employee.setMobileNumber("+61412345678");
+        employee.setStartDate(LocalDate.of(2026, 1, 15));
+        return employee;
+    }
+
+    private static EmployeeRequest validRequest() {
         return requestWithMobile("0412345678");
     }
 
-    private static CreateEmployeeRequest requestWithMobile(String mobile) {
-        return new CreateEmployeeRequest(
+    private static EmployeeRequest requestWithMobile(String mobile) {
+        return new EmployeeRequest(
                 "Jane", 1, null, "Doe", "jane@example.com", mobile,
                 "1 Test St", null, "Melbourne", "VIC", "3000",
                 EmployeeStatus.PERMANENT,
@@ -190,8 +280,8 @@ public class EmployeeServiceTest {
                 new BigDecimal("38"));
     }
 
-    private static CreateEmployeeRequest requestWithDates(LocalDate start, LocalDate end) {
-        return new CreateEmployeeRequest(
+    private static EmployeeRequest requestWithDates(LocalDate start, LocalDate end) {
+        return new EmployeeRequest(
                 "Jane", 1, null, "Doe", "jane@example.com", "0412345678",
                 "1 Test St", null, "Melbourne", "VIC", "3000",
                 EmployeeStatus.PERMANENT,

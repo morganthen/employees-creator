@@ -3,7 +3,7 @@ package com.morganthen.employees_creator.employee;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.morganthen.employees_creator.employee.dtos.CreateEmployeeRequest;
+import com.morganthen.employees_creator.employee.dtos.EmployeeRequest;
 import com.morganthen.employees_creator.employee.dtos.EmployeeResponse;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 @RestController
@@ -42,7 +43,7 @@ public class EmployeeController {
     }
 
     @PostMapping
-    public ResponseEntity<EmployeeResponse> create(@RequestBody @Valid CreateEmployeeRequest data) {
+    public ResponseEntity<EmployeeResponse> create(@RequestBody @Valid EmployeeRequest data) {
         EmployeeResponse createdEmployee = employeeService.create(data);
 
         return new ResponseEntity<EmployeeResponse>(createdEmployee, HttpStatus.CREATED);
@@ -52,6 +53,12 @@ public class EmployeeController {
     public ResponseEntity<Void> archive(@PathVariable Long id) {
         employeeService.archive(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<EmployeeResponse> update(@PathVariable Long id,
+            @RequestBody @Valid EmployeeRequest data) {
+        return ResponseEntity.ok(employeeService.update(id, data));
     }
 
 }
