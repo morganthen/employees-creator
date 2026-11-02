@@ -6,6 +6,17 @@ const AU_STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"] as const
 const required = (label: string) => z.string().trim().min(1, `${label} is required`);
 
 /**
+ * Canonical local form of an AU mobile: digits only, no `+61`/`61` country
+ * prefix and no trunk `0`. The backend re-normalises to `+61...` for storage.
+ */
+export function normalizeMobile(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits.startsWith("61")) return digits.slice(2);
+  if (digits.startsWith("0")) return digits.slice(1);
+  return digits;
+}
+
+/**
  * Validates the *form* shape: every field is a string because that's what
  * inputs produce. Mirrors the constraints on the backend's EmployeeRequest,
  * so the user gets feedback before a round trip. The server stays the
@@ -18,11 +29,11 @@ export const employeeFormSchema = z
     lastName: required("Last name"),
     email: required("Email").pipe(z.email("Enter a valid email address")),
     mobileNumber: required("Mobile number")
-      .transform((value) => value.replace(/[\s-]/g, ""))
+      .transform(normalizeMobile)
       .pipe(
         z
           .string()
-          .regex(/^0?4\d{8}$/, "Use an Australian mobile, e.g. 0412 345 678"),
+          .regex(/^4\d{8}$/, "Use an Australian mobile, e.g. 0412 345 678"),
       ),
     addressLine1: required("Address line 1"),
     addressLine2: z.string().trim(),
@@ -118,7 +129,7 @@ export function toPayload(values: FormValues): CreateEmployeeInput {
     middleName: optional(values.middleName),
     lastName: values.lastName.trim(),
     email: values.email.trim(),
-    mobileNumber: values.mobileNumber.replace(/[\s-]/g, "").trim(),
+    mobileNumber: normalizeMobile(values.mobileNumber),
     addressLine1: values.addressLine1.trim(),
     addressLine2: optional(values.addressLine2),
     suburb: values.suburb.trim(),

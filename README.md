@@ -22,7 +22,7 @@ Employees Creator is a full-stack employee records system. Users can create and 
 
 - **Backend:** Java 17, Spring Boot 4.1.1, Spring Data JPA, MySQL, Bean Validation, Maven.
 - **Frontend:** React 19, TypeScript, Vite, React Query, React Router, Tailwind CSS, zod.
-- **Testing & Tools:** JUnit, Mockito (in use); REST Assured, Vitest, React Testing Library (planned); Git, GitHub Actions, OpenAPI/Swagger.
+- **Testing & Tools:** JUnit, Mockito, Vitest, React Testing Library, jest-dom, user-event; REST Assured, Playwright (planned); Git, GitHub Actions, OpenAPI/Swagger.
 
 **Why this stack?**
 
@@ -86,11 +86,12 @@ Two tables: `employee` and `role`, joined N:1 (`employee.role_id` to `role.id`).
 
 2. The app is served at `http://localhost:5173` — list, detail, create (`/employees/new`) and edit (`/employees/:id/edit`).
 
-3. Type-check, lint and build:
+3. Type-check, lint, build and test:
 
    ```bash
    npm run build   # tsc -b && vite build
    npm run lint
+   npm test        # vitest run
    ```
 
 ---
@@ -160,7 +161,8 @@ spring.jpa.hibernate.ddl-auto=validate
 - [x] Controller tests (`EmployeeControllerTest`, `@WebMvcTest` + MockMvc) — 13 cases
 - [x] Create/edit form (client) — one shared `EmployeeForm`, zod schema as the validation source of truth
 - [x] Role dropdown fed from the API (client)
-- [ ] End-to-end (RestAssured) tests · CI · Flyway migrations
+- [x] Frontend tests (Vitest + React Testing Library) — 31 cases across the schema, form and archive flow
+- [ ] End-to-end (RestAssured / Playwright) tests · CI · Flyway migrations
 
 ---
 
@@ -170,7 +172,7 @@ spring.jpa.hibernate.ddl-auto=validate
 - Local dev connects as MySQL `root` with an empty password, read from `.env`. Set a real password and keep it out of version control before any non-local use.
 - Authentication/authorization is deferred, so `GET /api/roles` and the Swagger docs are currently public.
 - **`ddl-auto=validate` is set but there are no migrations yet.** Hibernate no longer creates/updates the schema, so a **fresh database has no tables** and any future entity change will fail the boot until **Flyway** is added. Migrations are the next infrastructure step.
-- Tests cover the entity (2), `EmployeeService` (16) and `EmployeeController` (13) — 32 total including the context load; no end-to-end (RestAssured) or frontend tests yet, and no CI.
+- Tests cover the entity (2), `EmployeeService` (16), `EmployeeController` (13), the context load (1) and the frontend (31 across `employeeSchema`, `EmployeeForm` and `EmployeeCard`) — 63 total. No end-to-end (RestAssured / Playwright) tests yet, and no CI.
 - Both `react-router` v8 and `react-router-dom` v7 are installed; the code imports from `react-router`, so the second package is dead weight and should be removed.
 - No request logging/observability yet (the logging slice is pending).
 
@@ -290,6 +292,8 @@ spring.jpa.hibernate.ddl-auto=validate
 - Archive failures now surface: `toApiError()` parses the `ApiErrorResponse` body into an `ApiError` (status + field `details`), instead of the old silent `throw new Error(...)`.
 - Server rejections map back onto the right field: 400 `details` → per-field messages, 409 → email. Derived during render (not in an effect) so `react-hooks/set-state-in-effect` stays clean.
 - Tests: `EmployeeServiceTest` 11 → 16, `EmployeeControllerTest` 8 → 13 (PUT 200/400/404/409/422).
+- Frontend tests: Vitest + jsdom + React Testing Library (`npm test`, 31 cases) — `employeeSchema` (validation, payload mapping, prefill round-trip), `EmployeeForm` (blocked submit, number/null payload, 409 on email, 400 field details, error clearing, pending state) and `EmployeeCard` (cancel does nothing, confirm archives exactly once, pending label).
+- Fixed a real bug the round-trip test caught: the API stores mobiles as `+61412345678`, so prefilling the edit form failed validation and would have 400'd the server. `normalizeMobile()` now strips `+61`/`61`/trunk `0` and is shared by the zod transform and `toPayload`.
 
 ---
 
@@ -385,6 +389,9 @@ spring.jpa.hibernate.ddl-auto=validate
 - **`.pipe()` doesn't short-circuit.** `required("Email").pipe(z.email(...))` reports both "required" and "invalid email" for an empty input, so `toFieldErrors` keeps only the first issue per field.
 - **Don't map server errors in an effect.** Setting state from `useEffect` on `apiError` tripped `react-hooks/set-state-in-effect`; deriving the error state during render and tracking a "dismissed" error instance is simpler and avoids a cascading render.
 - **Updating an email means ignoring yourself.** Reusing `existsByEmailAndArchivedAtIsNull` on update would reject an employee saving their own record; `existsByEmailAndArchivedAtIsNullAndIdNot` is the rule the UI implies.
+- **A round-trip test found a real bug.** Asserting that `toFormValues(employee)` parses with the same schema used for create failed immediately: the API stores `+61412345678`, but the schema only accepted `0412…`. Editing any existing employee would have been impossible without retyping the mobile. The fix was one exported `normalizeMobile()` shared by the schema transform and `toPayload`.
+- **Test the seam, not just the units.** `EmployeeForm` tests assert the payload (`roleId: 1`, `hoursPerWeek: 38`, `middleName: null`) rather than the rendered values — that's the contract the backend actually sees.
+- **npm is the weak link.** The default registry kept timing out mid-install (`ETIMEDOUT` on every packument, then `ETARGET` from a stale cache); the same install took 27s against a mirror. Worth knowing before blaming the lockfile.
 - **422 was renamed.** Spring 6.2+ calls it `UNPROCESSABLE_CONTENT` (`UNPROCESSABLE_ENTITY` is deprecated); `status().is(422)` avoids the API churn.
 
 ---
