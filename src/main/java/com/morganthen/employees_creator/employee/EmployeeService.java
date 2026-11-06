@@ -31,6 +31,14 @@ public class EmployeeService {
         return EmployeeResponse.of(employees);
     }
 
+    @Transactional(readOnly = true)
+    public EmployeeResponse findById(Long id) {
+        Employee employee = employeeRepository.findByIdAndArchivedAtIsNull(id)
+                .orElseThrow(() -> new NotFoundException("Employee not found: " + id));
+        return EmployeeResponse.of(employee);
+
+    }
+
     private String normalizeMobile(String mobile) {
         String digits = mobile.replaceAll("\\D", "");
         if (digits.startsWith("61")) {
@@ -114,14 +122,6 @@ public class EmployeeService {
         employee.setEndDate(req.endDate());
         employee.setEmploymentType(req.employmentType());
         employee.setHoursPerWeek(req.hoursPerWeek());
-    }
-
-    @Transactional(readOnly = true)
-    public EmployeeResponse findById(Long id) {
-        Employee employee = employeeRepository.findByIdAndArchivedAtIsNull(id)
-                .orElseThrow(() -> new NotFoundException("Employee not found: " + id));
-        return EmployeeResponse.of(employee);
-
     }
 
     @Transactional

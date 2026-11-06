@@ -16,24 +16,24 @@ import jakarta.validation.constraints.Size;
 
 public record EmployeeRequest(
 
-        @NotBlank String firstName,
-        @NotNull Integer roleId,
-        String middleName, // optional
+                @NotBlank @Size(max = 100) String firstName,
+                @NotNull Integer roleId,
+                @Size(max = 100) String middleName,
 
-        @NotBlank String lastName,
-        @NotBlank @Email String email,
-        @NotBlank @Pattern(regexp = "^0?4\\d{8}$") String mobileNumber,
+                @NotBlank @Size(max = 100) String lastName,
+                @NotBlank @Email @Size(max = 255) String email,
+                @NotBlank @Pattern(regexp = "^0?4\\d{8}$") String mobileNumber,
 
-        @NotBlank String addressLine1,
-        String addressLine2, // optional
-        @NotBlank String suburb,
-        @NotBlank @Size(min = 2, max = 3) String state,
-        @NotBlank @Pattern(regexp = "\\d{4}") String postcode,
+                @NotBlank @Size(max = 255) String addressLine1,
+                @Size(max = 255) String addressLine2,
+                @NotBlank @Size(max = 100) String suburb,
+                @NotBlank @Size(min = 2, max = 3) String state,
+                @NotBlank @Pattern(regexp = "\\d{4}") String postcode,
 
-        @NotNull EmployeeStatus employeeStatus,
-        @NotNull LocalDate startDate,
-        LocalDate endDate, // null = ongoing
-        @NotNull EmploymentType employmentType,
+                @NotNull EmployeeStatus employeeStatus,
+                @NotNull LocalDate startDate,
+                LocalDate endDate,
+                @NotNull EmploymentType employmentType,
 
-        @NotNull @DecimalMin("1") @DecimalMax("38") BigDecimal hoursPerWeek) {
+                @NotNull @DecimalMin("1") @DecimalMax("38") BigDecimal hoursPerWeek) {
 }
