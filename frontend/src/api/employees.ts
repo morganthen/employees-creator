@@ -46,7 +46,7 @@ export type CreateEmployeeInput = {
 export async function getEmployees(): Promise<Employee[]> {
   const res = await fetch("/api/employees");
   if (!res.ok) {
-    throw new Error("Failed to fetch employees");
+    throw await toApiError(res, "Failed to fetch employees");
   }
   const data = await res.json();
   return data;
@@ -55,8 +55,7 @@ export async function getEmployees(): Promise<Employee[]> {
 export async function getEmployee(id: string): Promise<Employee> {
   const res = await fetch(`/api/employees/${id}`);
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.message ?? "Failed to load employee");
+    throw await toApiError(res, "Failed to load employee");
   }
   return res.json();
 }

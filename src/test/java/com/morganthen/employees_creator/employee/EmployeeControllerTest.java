@@ -269,6 +269,15 @@ class EmployeeControllerTest {
                                 .andExpect(jsonPath("$.message").value("Employee not found: 999"));
         }
 
+        @Test
+        @DisplayName("GET by id returns 400 when the id is not a number")
+        void getById_whenIdNotNumeric_returns400() throws Exception {
+                mockMvc.perform(get("/api/employees/abc"))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.message").value("Invalid value for 'id'"))
+                                .andExpect(jsonPath("$.path").value("/api/employees/abc"));
+        }
+
         // ---------------------------------------------------------------- helper
 
         private static EmployeeResponse employeeResponse() {
