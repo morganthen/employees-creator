@@ -111,6 +111,7 @@ function describeApiError(error: unknown): {
  * Shared create/edit form. Validation lives in lib/employeeSchema (zod);
  * this component only wires state, errors and layout.
  */
+
 function EmployeeForm({
   heading,
   initialValues = EMPTY_EMPLOYEE_FORM,
@@ -322,7 +323,12 @@ function EmployeeForm({
             />
           </Field>
 
-          <Field id="postcode" label="Postcode" required error={errors.postcode}>
+          <Field
+            id="postcode"
+            label="Postcode"
+            required
+            error={errors.postcode}
+          >
             <input
               id="postcode"
               inputMode="numeric"

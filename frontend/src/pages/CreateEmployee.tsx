@@ -10,6 +10,7 @@ function CreateEmployee() {
   const create = useMutation({
     mutationFn: createEmployee,
     onSuccess: (employee) => {
+      queryClient.setQueryData(["employee", String(employee.id)], employee);
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       navigate(`/employees/${employee.id}`);
     },

@@ -1,9 +1,19 @@
 import { z } from "zod";
 import type { CreateEmployeeInput, Employee } from "../api/employees";
 
-const AU_STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"] as const;
+const AU_STATES = [
+  "NSW",
+  "VIC",
+  "QLD",
+  "WA",
+  "SA",
+  "TAS",
+  "ACT",
+  "NT",
+] as const;
 
-const required = (label: string) => z.string().trim().min(1, `${label} is required`);
+const required = (label: string) =>
+  z.string().trim().min(1, `${label} is required`);
 
 /**
  * Canonical local form of an AU mobile: digits only, no `+61`/`61` country
@@ -22,6 +32,7 @@ export function normalizeMobile(value: string): string {
  * so the user gets feedback before a round trip. The server stays the
  * source of truth (it re-validates and owns rules like email uniqueness).
  */
+
 export const employeeFormSchema = z
   .object({
     firstName: required("First name"),
@@ -43,9 +54,7 @@ export const employeeFormSchema = z
       z.string().regex(/^\d{4}$/, "Postcode must be 4 digits"),
     ),
     roleId: required("Role"),
-    employeeStatus: required("Status").pipe(
-      z.enum(["PERMANENT", "CONTRACT"]),
-    ),
+    employeeStatus: required("Status").pipe(z.enum(["PERMANENT", "CONTRACT"])),
     startDate: required("Start date"),
     endDate: z.string(),
     employmentType: required("Employment type").pipe(
@@ -58,7 +67,11 @@ export const employeeFormSchema = z
   })
   .superRefine((values, ctx) => {
     // cross-field rule the backend also enforces (422)
-    if (values.startDate && values.endDate && values.endDate < values.startDate) {
+    if (
+      values.startDate &&
+      values.endDate &&
+      values.endDate < values.startDate
+    ) {
       ctx.addIssue({
         code: "custom",
         path: ["endDate"],
@@ -136,7 +149,8 @@ export function toPayload(values: FormValues): CreateEmployeeInput {
     state: values.state,
     postcode: values.postcode.trim(),
     roleId: Number(values.roleId),
-    employeeStatus: values.employeeStatus as CreateEmployeeInput["employeeStatus"],
+    employeeStatus:
+      values.employeeStatus as CreateEmployeeInput["employeeStatus"],
     startDate: values.startDate,
     endDate: optional(values.endDate),
     employmentType:
