@@ -144,7 +144,7 @@ function EmployeeForm({
     setDismissedError(apiError);
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     setDismissedError(apiError);
